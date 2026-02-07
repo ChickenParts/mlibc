@@ -52,6 +52,14 @@
 #define SYS_getpgid_core       49
 #define SYS_setsid_core        50
 #define SYS_getsid_core        51
+/* Core-Yolk aliases for signal control */
+#define SYS_kill_core          52
+#define SYS_sigaction_core     53
+#define SYS_sigprocmask_core   54
+#define SYS_sigreturn_core     55
+#define SYS_sigsuspend_core    56
+#define SYS_sigpending_core    57
+#define SYS_tgkill_core        58
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 

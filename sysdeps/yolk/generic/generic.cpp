@@ -578,12 +578,12 @@ int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret
  */
 
 int sys_kill(pid_t pid, int sig) {
-    long result = __syscall2(SYS_kill, pid, sig);
+    long result = __syscall2(SYS_kill_core, pid, sig);
     return result < 0 ? -result : 0;
 }
 
 int sys_tgkill(pid_t tgid, pid_t tid, int sig) {
-    long result = __syscall3(SYS_tgkill, tgid, tid, sig);
+    long result = __syscall3(SYS_tgkill_core, tgid, tid, sig);
     return result < 0 ? -result : 0;
 }
 
@@ -605,30 +605,30 @@ int sys_sigaction(int signum, const struct sigaction *act,
         modified_act.sa_restorer = (act->sa_flags & SA_SIGINFO)
             ? __mlibc_signal_restore_rt
             : __mlibc_signal_restore;
-        long result = __syscall3(SYS_sigaction, signum, (long)&modified_act, (long)oldact);
+        long result = __syscall3(SYS_sigaction_core, signum, (long)&modified_act, (long)oldact);
         return result < 0 ? -result : 0;
     }
-    long result = __syscall3(SYS_sigaction, signum, (long)act, (long)oldact);
+    long result = __syscall3(SYS_sigaction_core, signum, (long)act, (long)oldact);
     return result < 0 ? -result : 0;
 }
 
 int sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
-    long result = __syscall3(SYS_sigprocmask, how, (long)set, (long)oldset);
+    long result = __syscall3(SYS_sigprocmask_core, how, (long)set, (long)oldset);
     return result < 0 ? -result : 0;
 }
 
 int sys_sigpending(sigset_t *set) {
-    long result = __syscall1(SYS_sigpending, (long)set);
+    long result = __syscall1(SYS_sigpending_core, (long)set);
     return result < 0 ? -result : 0;
 }
 
 int sys_sigsuspend(const sigset_t *mask) {
-    long result = __syscall1(SYS_sigsuspend, (long)mask);
+    long result = __syscall1(SYS_sigsuspend_core, (long)mask);
     return result < 0 ? -result : 0;
 }
 
 void sys_sigreturn() {
-    __syscall0(SYS_sigreturn);
+    __syscall0(SYS_sigreturn_core);
     __builtin_unreachable();
 }
 
