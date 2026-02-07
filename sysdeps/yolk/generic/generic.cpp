@@ -517,12 +517,12 @@ pid_t sys_gettid() {
 }
 
 int sys_setpgid(pid_t pid, pid_t pgid) {
-    long result = __syscall2(SYS_setpgid, pid, pgid);
+    long result = __syscall2(SYS_setpgid_core, pid, pgid);
     return result < 0 ? -result : 0;
 }
 
 int sys_getpgid(pid_t pid, pid_t *pgid) {
-    long result = __syscall1(SYS_getpgid, pid);
+    long result = __syscall1(SYS_getpgid_core, pid);
     if (result < 0) {
         return -result;
     }
@@ -531,7 +531,7 @@ int sys_getpgid(pid_t pid, pid_t *pgid) {
 }
 
 int sys_setsid(pid_t *sid) {
-    long result = __syscall0(SYS_setsid);
+    long result = __syscall0(SYS_setsid_core);
     if (result < 0) {
         return -result;
     }
@@ -540,7 +540,7 @@ int sys_setsid(pid_t *sid) {
 }
 
 int sys_getsid(pid_t pid, pid_t *sid) {
-    long result = __syscall1(SYS_getsid, pid);
+    long result = __syscall1(SYS_getsid_core, pid);
     if (result < 0) {
         return -result;
     }

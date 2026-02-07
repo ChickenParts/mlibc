@@ -47,6 +47,11 @@
 #define SYS_exit_group_core    45
 #define SYS_waitpid_core       46
 #define SYS_wait4_core         47
+/* Core-Yolk aliases for job control */
+#define SYS_setpgid_core       48
+#define SYS_getpgid_core       49
+#define SYS_setsid_core        50
+#define SYS_getsid_core        51
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 
