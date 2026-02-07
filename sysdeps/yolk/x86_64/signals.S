@@ -7,7 +7,7 @@
  * calls sigreturn to restore the original context.
  */
 
-#define SYS_sigreturn 343
+#define SYS_sigreturn_core 55
 
 .section .text
 
@@ -19,7 +19,7 @@
 .global __mlibc_signal_restore
 .type __mlibc_signal_restore, @function
 __mlibc_signal_restore:
-    mov $SYS_sigreturn, %rax
+    mov $SYS_sigreturn_core, %rax
     syscall
     /* Should never reach here - sigreturn doesn't return normally */
     ud2
@@ -32,7 +32,7 @@ __mlibc_signal_restore:
 .global __mlibc_signal_restore_rt
 .type __mlibc_signal_restore_rt, @function
 __mlibc_signal_restore_rt:
-    mov $SYS_sigreturn, %rax
+    mov $SYS_sigreturn_core, %rax
     syscall
     /* Should never reach here */
     ud2
