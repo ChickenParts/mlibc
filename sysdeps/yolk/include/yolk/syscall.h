@@ -20,11 +20,22 @@
 #define SYS_munmap          11
 #define SYS_ioctl           16
 #define SYS_yield           24
+/* Core-Yolk aliases for identity syscalls */
+#define SYS_getpid_core     25
+#define SYS_getppid_core    26
+#define SYS_gettid_core     27
+#define SYS_getuid_core     28
+#define SYS_geteuid_core    29
+#define SYS_getgid_core     30
+#define SYS_getegid_core    31
 #define SYS_dup             32
 #define SYS_dup2            33
 #define SYS_dup3            34
 #define SYS_pipe            35
 #define SYS_pipe2           36
+/* Core-Yolk aliases for FD lifecycle */
+#define SYS_open_core       37
+#define SYS_close_core      38
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 

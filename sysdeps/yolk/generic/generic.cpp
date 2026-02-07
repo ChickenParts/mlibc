@@ -167,7 +167,7 @@ int sys_vm_protect(void *pointer, size_t size, int prot) {
  */
 
 int sys_open(const char *path, int flags, mode_t mode, int *fd) {
-    long result = __syscall4(SYS_open, (long)path, flags, mode, AT_FDCWD);
+    long result = __syscall4(SYS_open_core, (long)path, flags, mode, AT_FDCWD);
     if (result < 0) {
         return -result;
     }
@@ -177,7 +177,7 @@ int sys_open(const char *path, int flags, mode_t mode, int *fd) {
 
 int sys_openat(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
     /* Yolk's open takes dirfd as 4th arg */
-    long result = __syscall4(SYS_open, (long)path, flags, mode, dirfd);
+    long result = __syscall4(SYS_open_core, (long)path, flags, mode, dirfd);
     if (result < 0) {
         return -result;
     }
@@ -186,7 +186,7 @@ int sys_openat(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
 }
 
 int sys_close(int fd) {
-    long result = __syscall1(SYS_close, fd);
+    long result = __syscall1(SYS_close_core, fd);
     if (result < 0) {
         return -result;
     }
@@ -489,31 +489,31 @@ int sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2
  */
 
 pid_t sys_getpid() {
-    return __syscall0(SYS_getpid);
+    return __syscall0(SYS_getpid_core);
 }
 
 pid_t sys_getppid() {
-    return __syscall0(SYS_getppid);
+    return __syscall0(SYS_getppid_core);
 }
 
 uid_t sys_getuid() {
-    return __syscall0(SYS_getuid);
+    return __syscall0(SYS_getuid_core);
 }
 
 uid_t sys_geteuid() {
-    return __syscall0(SYS_geteuid);
+    return __syscall0(SYS_geteuid_core);
 }
 
 gid_t sys_getgid() {
-    return __syscall0(SYS_getgid);
+    return __syscall0(SYS_getgid_core);
 }
 
 gid_t sys_getegid() {
-    return __syscall0(SYS_getegid);
+    return __syscall0(SYS_getegid_core);
 }
 
 pid_t sys_gettid() {
-    return __syscall0(SYS_gettid);
+    return __syscall0(SYS_gettid_core);
 }
 
 int sys_setpgid(pid_t pid, pid_t pgid) {
