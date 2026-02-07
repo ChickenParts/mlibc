@@ -77,6 +77,10 @@
 #define SYS_shutdown_core      128
 #define SYS_getsockname_core   129
 #define SYS_getpeername_core   130
+/* Core-Yolk aliases for epoll */
+#define SYS_epoll_create_core  131
+#define SYS_epoll_ctl_core     132
+#define SYS_epoll_wait_core    133
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 

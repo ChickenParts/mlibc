@@ -913,7 +913,7 @@ int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_se
  */
 
 int sys_epoll_create(int flags, int *fd) {
-    long result = __syscall1(SYS_epoll_create, flags);
+    long result = __syscall1(SYS_epoll_create_core, flags);
     if (result < 0) {
         return -result;
     }
@@ -922,7 +922,7 @@ int sys_epoll_create(int flags, int *fd) {
 }
 
 int sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
-    long result = __syscall4(SYS_epoll_ctl, epfd, op, fd, (long)event);
+    long result = __syscall4(SYS_epoll_ctl_core, epfd, op, fd, (long)event);
     if (result < 0) {
         return -result;
     }
@@ -932,7 +932,7 @@ int sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
 int sys_epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
                     int timeout, const sigset_t *sigmask, int *raised) {
     (void)sigmask;  /* TODO: sigmask support in kernel */
-    long result = __syscall4(SYS_epoll_wait, epfd, (long)events, maxevents, timeout);
+    long result = __syscall4(SYS_epoll_wait_core, epfd, (long)events, maxevents, timeout);
     if (result < 0) {
         return -result;
     }
