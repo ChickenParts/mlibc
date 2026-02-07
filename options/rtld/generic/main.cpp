@@ -30,7 +30,7 @@ static constexpr bool logDlCalls = false;
 
 #ifndef MLIBC_STATIC_BUILD
 extern HIDDEN void *_GLOBAL_OFFSET_TABLE_[];
-extern HIDDEN elf_dyn _DYNAMIC[];
+extern elf_dyn _DYNAMIC[];
 #endif
 
 namespace mlibc {

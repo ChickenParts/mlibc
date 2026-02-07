@@ -274,6 +274,10 @@ elif host_machine.system() == 'nyaux'
 	rtld_include_dirs += include_directories('sysdeps/nyaux/include')
 	libc_include_dirs += include_directories('sysdeps/nyaux/include')
 	subdir('sysdeps/nyaux')
+elif host_machine.system() == 'yolk'
+	rtld_include_dirs += include_directories('sysdeps/yolk/include')
+	libc_include_dirs += include_directories('sysdeps/yolk/include')
+	subdir('sysdeps/yolk')
 # ANCHOR: demo-sysdeps
 elif host_machine.system() == 'demo'
 	subdir('sysdeps/demo')
