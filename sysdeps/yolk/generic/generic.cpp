@@ -639,7 +639,7 @@ void sys_sigreturn() {
 
 int sys_clock_get(int clock, time_t *secs, long *nanos) {
     struct timespec ts;
-    long result = __syscall2(SYS_clock_gettime, clock, (long)&ts);
+    long result = __syscall2(SYS_clock_gettime_core, clock, (long)&ts);
     if (result < 0) {
         return -result;
     }
@@ -650,7 +650,7 @@ int sys_clock_get(int clock, time_t *secs, long *nanos) {
 
 int sys_clock_getres(int clock, time_t *secs, long *nanos) {
     struct timespec ts;
-    long result = __syscall2(SYS_clock_getres, clock, (long)&ts);
+    long result = __syscall2(SYS_clock_getres_core, clock, (long)&ts);
     if (result < 0) {
         return -result;
     }
@@ -662,7 +662,7 @@ int sys_clock_getres(int clock, time_t *secs, long *nanos) {
 int sys_sleep(time_t *secs, long *nanos) {
     struct timespec req = {*secs, *nanos};
     struct timespec rem = {0, 0};
-    long result = __syscall2(SYS_nanosleep, (long)&req, (long)&rem);
+    long result = __syscall2(SYS_nanosleep_core, (long)&req, (long)&rem);
     if (result < 0) {
         *secs = rem.tv_sec;
         *nanos = rem.tv_nsec;
@@ -674,7 +674,7 @@ int sys_sleep(time_t *secs, long *nanos) {
 }
 
 int sys_gettimeofday(struct timeval *tv) {
-    long result = __syscall2(SYS_gettimeofday, (long)tv, 0);
+    long result = __syscall2(SYS_gettimeofday_core, (long)tv, 0);
     return result < 0 ? -result : 0;
 }
 

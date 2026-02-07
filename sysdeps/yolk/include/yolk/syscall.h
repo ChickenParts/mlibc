@@ -36,6 +36,11 @@
 /* Core-Yolk aliases for FD lifecycle */
 #define SYS_open_core       37
 #define SYS_close_core      38
+/* Core-Yolk aliases for time primitives */
+#define SYS_clock_gettime_core 39
+#define SYS_clock_getres_core  40
+#define SYS_nanosleep_core     41
+#define SYS_gettimeofday_core  42
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 
