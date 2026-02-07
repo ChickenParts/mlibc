@@ -60,6 +60,14 @@
 #define SYS_sigsuspend_core    56
 #define SYS_sigpending_core    57
 #define SYS_tgkill_core        58
+/* Core-Yolk aliases for minimal *at compatibility subset */
+#define SYS_fstatat_core       64
+#define SYS_mkdirat_core       65
+#define SYS_unlinkat_core      66
+#define SYS_renameat_core      67
+#define SYS_fchmodat_core      68
+#define SYS_faccessat_core     69
+#define SYS_utimensat_core     70
 /* Core-Yolk aliases for socket/network paths */
 #define SYS_socket_core        115
 #define SYS_socketpair_core    116

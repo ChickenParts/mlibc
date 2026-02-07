@@ -262,7 +262,7 @@ int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags,
         result = __syscall2(SYS_fstat, fd, (long)statbuf);
     } else {
         /* fsfd_target::fd_path - fstatat with fallback for AT_FDCWD */
-        result = __syscall4(SYS_fstatat, fd, (long)path, (long)statbuf, flags);
+        result = __syscall4(SYS_fstatat_core, fd, (long)path, (long)statbuf, flags);
         if (sc_enosys(result) && fd == AT_FDCWD) {
             if (flags & AT_SYMLINK_NOFOLLOW) {
                 result = __syscall2(SYS_lstat, (long)path, (long)statbuf);
@@ -321,7 +321,7 @@ int sys_mkdir(const char *path, mode_t mode) {
 }
 
 int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
-    long result = __syscall3(SYS_mkdirat, dirfd, (long)path, mode);
+    long result = __syscall3(SYS_mkdirat_core, dirfd, (long)path, mode);
     if (sc_enosys(result) && dirfd == AT_FDCWD) {
         result = __syscall2(SYS_mkdir, (long)path, mode);
     }
@@ -376,7 +376,7 @@ int sys_unlink(const char *path) {
 }
 
 int sys_unlinkat(int dirfd, const char *path, int flags) {
-    long result = __syscall3(SYS_unlinkat, dirfd, (long)path, flags);
+    long result = __syscall3(SYS_unlinkat_core, dirfd, (long)path, flags);
     if (sc_enosys(result) && dirfd == AT_FDCWD) {
         if (flags & AT_REMOVEDIR) {
             result = __syscall1(SYS_rmdir, (long)path);
@@ -410,7 +410,7 @@ int sys_rename(const char *old_path, const char *new_path) {
 
 int sys_renameat(int old_dirfd, const char *old_path, int new_dirfd,
                  const char *new_path) {
-    long result = __syscall4(SYS_renameat, old_dirfd, (long)old_path, new_dirfd, (long)new_path);
+    long result = __syscall4(SYS_renameat_core, old_dirfd, (long)old_path, new_dirfd, (long)new_path);
     if (sc_enosys(result) && old_dirfd == AT_FDCWD && new_dirfd == AT_FDCWD) {
         result = __syscall2(SYS_rename, (long)old_path, (long)new_path);
     }
@@ -433,7 +433,7 @@ int sys_fchmod(int fd, mode_t mode) {
 }
 
 int sys_fchmodat(int dirfd, const char *path, mode_t mode, int flags) {
-    long result = __syscall4(SYS_fchmodat, dirfd, (long)path, mode, flags);
+    long result = __syscall4(SYS_fchmodat_core, dirfd, (long)path, mode, flags);
     if (sc_enosys(result) && dirfd == AT_FDCWD) {
         if (flags != 0) {
             return EINVAL;
@@ -459,7 +459,7 @@ int sys_access(const char *path, int mode) {
 }
 
 int sys_faccessat(int dirfd, const char *pathname, int mode, int flags) {
-    long result = __syscall4(SYS_faccessat, dirfd, (long)pathname, mode, flags);
+    long result = __syscall4(SYS_faccessat_core, dirfd, (long)pathname, mode, flags);
     if (sc_enosys(result) && dirfd == AT_FDCWD) {
         if (flags != 0) {
             return EINVAL;
@@ -471,7 +471,7 @@ int sys_faccessat(int dirfd, const char *pathname, int mode, int flags) {
 
 int sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2],
                   int flags) {
-    long result = __syscall4(SYS_utimensat, dirfd, (long)pathname, (long)times, flags);
+    long result = __syscall4(SYS_utimensat_core, dirfd, (long)pathname, (long)times, flags);
     if (sc_enosys(result) && dirfd == AT_FDCWD && pathname && flags == 0) {
         struct timeval tv[2];
         tv[0].tv_sec = times[0].tv_sec;
