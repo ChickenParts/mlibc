@@ -41,6 +41,12 @@
 #define SYS_clock_getres_core  40
 #define SYS_nanosleep_core     41
 #define SYS_gettimeofday_core  42
+/* Core-Yolk aliases for process control */
+#define SYS_fork_core          43
+#define SYS_execve_core        44
+#define SYS_exit_group_core    45
+#define SYS_waitpid_core       46
+#define SYS_wait4_core         47
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 

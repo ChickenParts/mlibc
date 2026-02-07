@@ -67,7 +67,7 @@ void sys_libc_log(const char *message) {
 }
 
 [[noreturn]] void sys_exit(int status) {
-    __syscall1(SYS_exit_group, status);
+    __syscall1(SYS_exit_group_core, status);
     __builtin_unreachable();
 }
 
@@ -549,7 +549,7 @@ int sys_getsid(pid_t pid, pid_t *sid) {
 }
 
 int sys_fork(pid_t *child) {
-    long result = __syscall0(SYS_fork);
+    long result = __syscall0(SYS_fork_core);
     if (result < 0) {
         return -result;
     }
@@ -558,13 +558,13 @@ int sys_fork(pid_t *child) {
 }
 
 int sys_execve(const char *path, char *const argv[], char *const envp[]) {
-    long result = __syscall3(SYS_execve, (long)path, (long)argv, (long)envp);
+    long result = __syscall3(SYS_execve_core, (long)path, (long)argv, (long)envp);
     /* execve only returns on error */
     return -result;
 }
 
 int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
-    long result = __syscall4(SYS_wait4, pid, (long)status, flags, (long)ru);
+    long result = __syscall4(SYS_wait4_core, pid, (long)status, flags, (long)ru);
     if (result < 0) {
         return -result;
     }
