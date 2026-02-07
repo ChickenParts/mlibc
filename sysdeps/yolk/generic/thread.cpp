@@ -101,20 +101,20 @@ int sys_clone(void *tcb, pid_t *tid_out, void *stack) {
         "jmp __mlibc_thread_entry\n\t"
         "1:\n\t"                        /* Parent continues here */
         : "=a"(result)
-        : "a"((long)SYS_clone), "D"(flags), "S"(stack),
+        : "a"((long)SYS_clone_core), "D"(flags), "S"(stack),
           "d"((unsigned long)tid_out), "r"(r10), "r"(r8)
         : "rcx", "r11", "memory", "cc"
     );
 #elif defined(__aarch64__)
     /* TODO: aarch64 implementation */
-    result = __syscall5(SYS_clone, flags, (long)stack,
+    result = __syscall5(SYS_clone_core, flags, (long)stack,
                         0, (long)tid_out, (long)tcb);
     if (result == 0) {
         __mlibc_thread_entry();
     }
 #elif defined(__riscv)
     /* TODO: riscv implementation */
-    result = __syscall5(SYS_clone, flags, (long)stack,
+    result = __syscall5(SYS_clone_core, flags, (long)stack,
                         0, (long)tid_out, (long)tcb);
     if (result == 0) {
         __mlibc_thread_entry();

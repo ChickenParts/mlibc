@@ -60,6 +60,7 @@
 #define SYS_sigsuspend_core    56
 #define SYS_sigpending_core    57
 #define SYS_tgkill_core        58
+#define SYS_clone_core         59
 /* Core-Yolk aliases for minimal *at compatibility subset */
 #define SYS_fstatat_core       64
 #define SYS_mkdirat_core       65
