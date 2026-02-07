@@ -84,6 +84,10 @@
 /* Core-Yolk aliases for poll-with-mask */
 #define SYS_pselect_core       134
 #define SYS_ppoll_core         135
+/* Native async waitset core syscalls */
+#define SYS_waitset_create     160
+#define SYS_waitset_ctl        161
+#define SYS_waitset_wait       162
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 
