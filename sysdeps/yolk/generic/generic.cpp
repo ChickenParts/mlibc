@@ -746,7 +746,7 @@ int sys_pipe(int *fds, int flags) {
  */
 
 int sys_socket(int domain, int type, int protocol, int *fd) {
-    long result = __syscall3(SYS_socket, domain, type, protocol);
+    long result = __syscall3(SYS_socket_core, domain, type, protocol);
     if (result < 0) {
         return -result;
     }
@@ -755,7 +755,7 @@ int sys_socket(int domain, int type, int protocol, int *fd) {
 }
 
 int sys_bind(int fd, const struct sockaddr *addr, socklen_t addrlen) {
-    long result = __syscall3(SYS_bind, fd, (long)addr, addrlen);
+    long result = __syscall3(SYS_bind_core, fd, (long)addr, addrlen);
     if (result < 0) {
         return -result;
     }
@@ -763,7 +763,7 @@ int sys_bind(int fd, const struct sockaddr *addr, socklen_t addrlen) {
 }
 
 int sys_listen(int fd, int backlog) {
-    long result = __syscall2(SYS_listen, fd, backlog);
+    long result = __syscall2(SYS_listen_core, fd, backlog);
     if (result < 0) {
         return -result;
     }
@@ -774,9 +774,9 @@ int sys_accept(int fd, int *newfd, struct sockaddr *addr, socklen_t *addrlen,
                int flags) {
     long result;
     if (flags) {
-        result = __syscall4(SYS_accept4, fd, (long)addr, (long)addrlen, flags);
+        result = __syscall4(SYS_accept4_core, fd, (long)addr, (long)addrlen, flags);
     } else {
-        result = __syscall3(SYS_accept, fd, (long)addr, (long)addrlen);
+        result = __syscall3(SYS_accept_core, fd, (long)addr, (long)addrlen);
     }
     if (result < 0) {
         return -result;
@@ -786,7 +786,7 @@ int sys_accept(int fd, int *newfd, struct sockaddr *addr, socklen_t *addrlen,
 }
 
 int sys_connect(int fd, const struct sockaddr *addr, socklen_t addrlen) {
-    long result = __syscall3(SYS_connect, fd, (long)addr, addrlen);
+    long result = __syscall3(SYS_connect_core, fd, (long)addr, addrlen);
     if (result < 0) {
         return -result;
     }
@@ -794,7 +794,7 @@ int sys_connect(int fd, const struct sockaddr *addr, socklen_t addrlen) {
 }
 
 int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
-    long result = __syscall3(SYS_sendmsg, fd, (long)hdr, flags);
+    long result = __syscall3(SYS_sendmsg_core, fd, (long)hdr, flags);
     if (result < 0) {
         return -result;
     }
@@ -803,7 +803,7 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
 }
 
 int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
-    long result = __syscall3(SYS_recvmsg, fd, (long)hdr, flags);
+    long result = __syscall3(SYS_recvmsg_core, fd, (long)hdr, flags);
     if (result < 0) {
         return -result;
     }
@@ -813,7 +813,7 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
 
 int sys_setsockopt(int fd, int layer, int number, const void *buffer,
                    socklen_t size) {
-    long result = __syscall5(SYS_setsockopt, fd, layer, number, (long)buffer, size);
+    long result = __syscall5(SYS_setsockopt_core, fd, layer, number, (long)buffer, size);
     if (result < 0) {
         return -result;
     }
@@ -822,7 +822,7 @@ int sys_setsockopt(int fd, int layer, int number, const void *buffer,
 
 int sys_getsockopt(int fd, int layer, int number, void *__restrict buffer,
                    socklen_t *__restrict size) {
-    long result = __syscall5(SYS_getsockopt, fd, layer, number, (long)buffer, (long)size);
+    long result = __syscall5(SYS_getsockopt_core, fd, layer, number, (long)buffer, (long)size);
     if (result < 0) {
         return -result;
     }
@@ -832,7 +832,7 @@ int sys_getsockopt(int fd, int layer, int number, void *__restrict buffer,
 int sys_sockname(int fd, struct sockaddr *addr, socklen_t max_addr_length,
                  socklen_t *actual_addr_length) {
     *actual_addr_length = max_addr_length;
-    long result = __syscall3(SYS_getsockname, fd, (long)addr, (long)actual_addr_length);
+    long result = __syscall3(SYS_getsockname_core, fd, (long)addr, (long)actual_addr_length);
     if (result < 0) {
         return -result;
     }
@@ -842,7 +842,7 @@ int sys_sockname(int fd, struct sockaddr *addr, socklen_t max_addr_length,
 int sys_peername(int fd, struct sockaddr *addr, socklen_t max_addr_length,
                  socklen_t *actual_addr_length) {
     *actual_addr_length = max_addr_length;
-    long result = __syscall3(SYS_getpeername, fd, (long)addr, (long)actual_addr_length);
+    long result = __syscall3(SYS_getpeername_core, fd, (long)addr, (long)actual_addr_length);
     if (result < 0) {
         return -result;
     }
@@ -852,7 +852,7 @@ int sys_peername(int fd, struct sockaddr *addr, socklen_t max_addr_length,
 ssize_t sys_sendto(int fd, const void *buf, size_t len, int flags,
                    const struct sockaddr *dest_addr, socklen_t addrlen,
                    ssize_t *bytes_sent) {
-    long result = __syscall6(SYS_sendto, fd, (long)buf, len, flags,
+    long result = __syscall6(SYS_sendto_core, fd, (long)buf, len, flags,
                              (long)dest_addr, addrlen);
     if (result < 0) {
         return -result;
@@ -864,7 +864,7 @@ ssize_t sys_sendto(int fd, const void *buf, size_t len, int flags,
 ssize_t sys_recvfrom(int fd, void *buf, size_t len, int flags,
                      struct sockaddr *src_addr, socklen_t *addrlen,
                      ssize_t *bytes_recv) {
-    long result = __syscall6(SYS_recvfrom, fd, (long)buf, len, flags,
+    long result = __syscall6(SYS_recvfrom_core, fd, (long)buf, len, flags,
                              (long)src_addr, (long)addrlen);
     if (result < 0) {
         return -result;
@@ -874,7 +874,7 @@ ssize_t sys_recvfrom(int fd, void *buf, size_t len, int flags,
 }
 
 int sys_shutdown(int sockfd, int how) {
-    long result = __syscall2(SYS_shutdown, sockfd, how);
+    long result = __syscall2(SYS_shutdown_core, sockfd, how);
     if (result < 0) {
         return -result;
     }

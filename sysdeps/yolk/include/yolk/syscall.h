@@ -60,6 +60,23 @@
 #define SYS_sigsuspend_core    56
 #define SYS_sigpending_core    57
 #define SYS_tgkill_core        58
+/* Core-Yolk aliases for socket/network paths */
+#define SYS_socket_core        115
+#define SYS_socketpair_core    116
+#define SYS_bind_core          117
+#define SYS_listen_core        118
+#define SYS_accept_core        119
+#define SYS_accept4_core       120
+#define SYS_connect_core       121
+#define SYS_sendto_core        122
+#define SYS_recvfrom_core      123
+#define SYS_sendmsg_core       124
+#define SYS_recvmsg_core       125
+#define SYS_getsockopt_core    126
+#define SYS_setsockopt_core    127
+#define SYS_shutdown_core      128
+#define SYS_getsockname_core   129
+#define SYS_getpeername_core   130
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 
