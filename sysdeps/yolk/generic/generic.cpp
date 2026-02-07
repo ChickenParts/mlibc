@@ -898,7 +898,7 @@ int sys_poll(struct pollfd *fds, nfds_t count, int timeout, int *num_events) {
 int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
                 const struct timespec *timeout, const sigset_t *sigmask,
                 int *num_events) {
-    long result = __syscall6(SYS_pselect, nfds, (long)read_set, (long)write_set,
+    long result = __syscall6(SYS_pselect_core, nfds, (long)read_set, (long)write_set,
                              (long)except_set, (long)timeout, (long)sigmask);
     if (result < 0) {
         return -result;

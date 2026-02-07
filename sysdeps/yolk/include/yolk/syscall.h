@@ -81,6 +81,9 @@
 #define SYS_epoll_create_core  131
 #define SYS_epoll_ctl_core     132
 #define SYS_epoll_wait_core    133
+/* Core-Yolk aliases for poll-with-mask */
+#define SYS_pselect_core       134
+#define SYS_ppoll_core         135
 #define SYS_fcntl           72
 #define SYS_ppoll           271 /* Poll with sigmask */
 
