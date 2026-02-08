@@ -100,7 +100,6 @@
 #define SYS_waitset_ctl        161
 #define SYS_waitset_wait       162
 #define SYS_fcntl           72
-#define YOLK_LEGACY_NR_ppoll    271 /* Poll with sigmask */
 
 /* VFS syscalls */
 #define SYS_lseek           8
@@ -130,14 +129,6 @@
 #define SYS_fchmod          91
 #define SYS_fchown          93
 #define SYS_access          94
-#define YOLK_LEGACY_NR_fstatat  262
-#define YOLK_LEGACY_NR_mkdirat  263
-#define YOLK_LEGACY_NR_unlinkat 264
-#define YOLK_LEGACY_NR_renameat 265
-#define YOLK_LEGACY_NR_fchmodat 266
-#define YOLK_LEGACY_NR_faccessat 267
-#define YOLK_LEGACY_NR_utimensat 268
-#define YOLK_LEGACY_NR_pselect  270
 #define SYS_fstatat         SYS_fstatat_core
 #define SYS_mkdirat         SYS_mkdirat_core
 #define SYS_unlinkat        SYS_unlinkat_core
@@ -147,8 +138,6 @@
 #define SYS_utimensat       SYS_utimensat_core
 #define SYS_pselect         SYS_pselect_core
 #define SYS_ppoll           SYS_ppoll_core
-#define YOLK_LEGACY_NR_open     257
-#define YOLK_LEGACY_NR_close    258
 #define SYS_open            SYS_open_core
 #define SYS_close           SYS_close_core
 
@@ -158,10 +147,6 @@
 #define SYS_futex           228
 
 /* Time syscalls */
-#define YOLK_LEGACY_NR_clock_gettime 288
-#define YOLK_LEGACY_NR_clock_getres  290
-#define YOLK_LEGACY_NR_nanosleep     291
-#define YOLK_LEGACY_NR_gettimeofday  293
 #define SYS_clock_gettime   SYS_clock_gettime_core
 #define SYS_clock_getres    SYS_clock_getres_core
 #define SYS_nanosleep       SYS_nanosleep_core
@@ -171,30 +156,12 @@
 #define SYS_uname           63
 
 /* Process syscalls */
-#define YOLK_LEGACY_NR_fork    320
-#define YOLK_LEGACY_NR_vfork   321
-#define YOLK_LEGACY_NR_clone   322
-#define YOLK_LEGACY_NR_getpid   323
-#define YOLK_LEGACY_NR_getppid  324
-#define YOLK_LEGACY_NR_getuid   325
-#define YOLK_LEGACY_NR_geteuid  326
-#define YOLK_LEGACY_NR_getgid   327
-#define YOLK_LEGACY_NR_getegid  328
 #define SYS_getpid          SYS_getpid_core
 #define SYS_getppid         SYS_getppid_core
 #define SYS_getuid          SYS_getuid_core
 #define SYS_geteuid         SYS_geteuid_core
 #define SYS_getgid          SYS_getgid_core
 #define SYS_getegid         SYS_getegid_core
-#define YOLK_LEGACY_NR_gettid      329
-#define YOLK_LEGACY_NR_setpgid     330
-#define YOLK_LEGACY_NR_getpgid     331
-#define YOLK_LEGACY_NR_setsid      332
-#define YOLK_LEGACY_NR_getsid      333
-#define YOLK_LEGACY_NR_execve      334
-#define YOLK_LEGACY_NR_exit_group  335
-#define YOLK_LEGACY_NR_waitpid     336
-#define YOLK_LEGACY_NR_wait4       337
 #define SYS_fork            SYS_fork_core
 #define SYS_vfork           SYS_vfork_core
 #define SYS_clone           SYS_clone_core
@@ -209,14 +176,6 @@
 #define SYS_wait4           SYS_wait4_core
 
 /* Signal syscalls */
-#define YOLK_LEGACY_NR_kill      340
-#define YOLK_LEGACY_NR_sigaction 341
-#define YOLK_LEGACY_NR_sigprocmask 342
-#define YOLK_LEGACY_NR_sigreturn   343
-#define YOLK_LEGACY_NR_sigsuspend  344
-#define YOLK_LEGACY_NR_sigpending  345
-#define YOLK_LEGACY_NR_tkill       346
-#define YOLK_LEGACY_NR_tgkill      347
 #define SYS_kill            SYS_kill_core
 #define SYS_sigaction       SYS_sigaction_core
 #define SYS_sigprocmask     SYS_sigprocmask_core
@@ -249,22 +208,6 @@
 #define SYS_service_register 350
 
 /* Network/Socket syscalls - must match kernel nr.h (400-420 range) */
-#define YOLK_LEGACY_NR_socket      400
-#define YOLK_LEGACY_NR_socketpair  401
-#define YOLK_LEGACY_NR_bind        402
-#define YOLK_LEGACY_NR_listen      403
-#define YOLK_LEGACY_NR_accept      404
-#define YOLK_LEGACY_NR_accept4     405
-#define YOLK_LEGACY_NR_connect     406
-#define YOLK_LEGACY_NR_sendto      407
-#define YOLK_LEGACY_NR_recvfrom    408
-#define YOLK_LEGACY_NR_sendmsg     409
-#define YOLK_LEGACY_NR_recvmsg     410
-#define YOLK_LEGACY_NR_getsockopt  411
-#define YOLK_LEGACY_NR_setsockopt  412
-#define YOLK_LEGACY_NR_shutdown    413
-#define YOLK_LEGACY_NR_getsockname 414
-#define YOLK_LEGACY_NR_getpeername 415
 #define SYS_socket          SYS_socket_core
 #define SYS_socketpair      SYS_socketpair_core
 #define SYS_bind            SYS_bind_core
@@ -283,9 +226,6 @@
 #define SYS_getpeername     SYS_getpeername_core
 
 /* epoll syscalls (420-422) */
-#define YOLK_LEGACY_NR_epoll_create 420
-#define YOLK_LEGACY_NR_epoll_ctl    421
-#define YOLK_LEGACY_NR_epoll_wait   422
 #define SYS_epoll_create    SYS_epoll_create_core
 #define SYS_epoll_ctl       SYS_epoll_ctl_core
 #define SYS_epoll_wait      SYS_epoll_wait_core
