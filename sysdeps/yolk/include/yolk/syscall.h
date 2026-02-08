@@ -136,8 +136,10 @@
 #define SYS_faccessat       267
 #define SYS_utimensat       268
 #define SYS_pselect         270
-#define SYS_open            257
-#define SYS_close           258
+#define YOLK_LEGACY_NR_open     257
+#define YOLK_LEGACY_NR_close    258
+#define SYS_open            SYS_open_core
+#define SYS_close           SYS_close_core
 
 /* Futex syscalls */
 #define SYS_futex_wait      224
@@ -157,12 +159,18 @@
 #define SYS_fork            320
 #define SYS_vfork           321
 #define SYS_clone           322
-#define SYS_getpid          323
-#define SYS_getppid         324
-#define SYS_getuid          325
-#define SYS_geteuid         326
-#define SYS_getgid          327
-#define SYS_getegid         328
+#define YOLK_LEGACY_NR_getpid   323
+#define YOLK_LEGACY_NR_getppid  324
+#define YOLK_LEGACY_NR_getuid   325
+#define YOLK_LEGACY_NR_geteuid  326
+#define YOLK_LEGACY_NR_getgid   327
+#define YOLK_LEGACY_NR_getegid  328
+#define SYS_getpid          SYS_getpid_core
+#define SYS_getppid         SYS_getppid_core
+#define SYS_getuid          SYS_getuid_core
+#define SYS_geteuid         SYS_geteuid_core
+#define SYS_getgid          SYS_getgid_core
+#define SYS_getegid         SYS_getegid_core
 #define SYS_gettid          329
 #define SYS_setpgid         330
 #define SYS_getpgid         331
@@ -175,7 +183,8 @@
 
 /* Signal syscalls */
 #define SYS_kill            340
-#define SYS_sigaction       341
+#define YOLK_LEGACY_NR_sigaction 341
+#define SYS_sigaction       SYS_sigaction_core
 #define SYS_sigprocmask     342
 #define SYS_sigreturn       343
 #define SYS_sigsuspend      344
