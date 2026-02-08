@@ -61,6 +61,8 @@
 #define SYS_sigpending_core    57
 #define SYS_tgkill_core        58
 #define SYS_clone_core         59
+#define SYS_vfork_core         60
+#define SYS_tkill_core         61
 /* Core-Yolk aliases for minimal *at compatibility subset */
 #define SYS_fstatat_core       64
 #define SYS_mkdirat_core       65
@@ -194,7 +196,7 @@
 #define YOLK_LEGACY_NR_waitpid     336
 #define YOLK_LEGACY_NR_wait4       337
 #define SYS_fork            SYS_fork_core
-#define SYS_vfork           YOLK_LEGACY_NR_vfork
+#define SYS_vfork           SYS_vfork_core
 #define SYS_clone           SYS_clone_core
 #define SYS_gettid          SYS_gettid_core
 #define SYS_setpgid         SYS_setpgid_core
@@ -221,7 +223,7 @@
 #define SYS_sigreturn       SYS_sigreturn_core
 #define SYS_sigsuspend      SYS_sigsuspend_core
 #define SYS_sigpending      SYS_sigpending_core
-#define SYS_tkill           YOLK_LEGACY_NR_tkill
+#define SYS_tkill           SYS_tkill_core
 #define SYS_tgkill          SYS_tgkill_core
 
 /* IPC syscalls */
