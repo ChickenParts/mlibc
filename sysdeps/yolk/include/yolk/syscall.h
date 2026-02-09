@@ -99,6 +99,11 @@
 #define SYS_waitset_create     160
 #define SYS_waitset_ctl        161
 #define SYS_waitset_wait       162
+/* Core-Yolk alias for legacy service registration */
+#define SYS_service_register_core 96
+/* Core-Yolk aliases for legacy console control */
+#define SYS_console_takeover_core 140
+#define SYS_console_release_core  141
 #define SYS_fcntl           72
 
 /* VFS syscalls */
@@ -205,7 +210,7 @@
 #define SYS_shmem_resize        114
 
 /* Service registration */
-#define SYS_service_register 350
+#define SYS_service_register SYS_service_register_core
 
 /* Network/Socket syscalls - must match kernel nr.h (400-420 range) */
 #define SYS_socket          SYS_socket_core
@@ -231,8 +236,8 @@
 #define SYS_epoll_wait      SYS_epoll_wait_core
 
 /* Console syscalls */
-#define SYS_console_takeover 360  /* Request userspace takeover of console */
-#define SYS_console_release  361  /* Release console back to kernel */
+#define SYS_console_takeover SYS_console_takeover_core  /* Request userspace takeover of console */
+#define SYS_console_release  SYS_console_release_core   /* Release console back to kernel */
 
 /* Console types */
 #define CONSOLE_SERIAL      0
