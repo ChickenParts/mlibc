@@ -898,20 +898,13 @@ int sys_poll(struct pollfd *fds, nfds_t count, int timeout, int *num_events) {
     return 0;
 }
 
-int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
-                const struct timespec *timeout, const sigset_t *sigmask,
-                int *num_events) {
-    long result = __syscall6(SYS_pselect_core, nfds, (long)read_set, (long)write_set,
-                             (long)except_set, (long)timeout, (long)sigmask);
+int sys_ppoll(struct pollfd *fds, nfds_t count, const struct timespec *timeout,
+              const sigset_t *sigmask, int *num_events) {
+    long result = __syscall4(SYS_ppoll_core, (long)fds, (long)count, (long)timeout, (long)sigmask);
     if (sc_enosys(result)) {
-        /* Userspace fallback to poll(2).
-         * Note: like the current epoll_pwait path, this ignores sigmask
-         * atomicity semantics for now. */
+        /* Userspace fallback to poll(2). This intentionally ignores atomic
+         * signal-mask switching semantics for now, matching current pselect fallback. */
         (void)sigmask;
-
-        if (nfds < 0 || nfds > FD_SETSIZE) {
-            return EINVAL;
-        }
 
         int timeout_ms = -1;
         if (timeout) {
@@ -925,6 +918,31 @@ int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_se
             } else {
                 timeout_ms = static_cast<int>(ms);
             }
+        }
+
+        result = __syscall3(SYS_poll, (long)fds, (long)count, timeout_ms);
+    }
+
+    if (sc_failed(result)) {
+        return sc_errno(result);
+    }
+    *num_events = result;
+    return 0;
+}
+
+int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
+                const struct timespec *timeout, const sigset_t *sigmask,
+                int *num_events) {
+    long result = __syscall6(SYS_pselect_core, nfds, (long)read_set, (long)write_set,
+                             (long)except_set, (long)timeout, (long)sigmask);
+    if (sc_enosys(result)) {
+        /* Userspace fallback to poll(2).
+         * Note: like the current epoll_pwait path, this ignores sigmask
+         * atomicity semantics for now. */
+        (void)sigmask;
+
+        if (nfds < 0 || nfds > FD_SETSIZE) {
+            return EINVAL;
         }
 
         fd_set in_read, in_write, in_except;
@@ -968,9 +986,10 @@ int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_se
             poll_count++;
         }
 
-        result = __syscall3(SYS_poll, (long)pfds, poll_count, timeout_ms);
-        if (sc_failed(result)) {
-            return sc_errno(result);
+        int ppoll_events = 0;
+        int e = sys_ppoll(pfds, poll_count, timeout, sigmask, &ppoll_events);
+        if (e) {
+            return e;
         }
 
         int ready = 0;
