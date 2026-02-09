@@ -798,6 +798,18 @@ int sys_connect(int fd, const struct sockaddr *addr, socklen_t addrlen) {
 
 int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
     long result = __syscall3(SYS_sendmsg_core, fd, (long)hdr, flags);
+    if (sc_enosys(result)) {
+        if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
+            return ENOSYS;
+        }
+        if (hdr->msg_control && hdr->msg_controllen) {
+            return ENOSYS;
+        }
+
+        const struct iovec *iov = hdr->msg_iov;
+        result = __syscall6(SYS_sendto_core, fd, (long)iov[0].iov_base, iov[0].iov_len,
+                            flags, (long)hdr->msg_name, hdr->msg_namelen);
+    }
     if (result < 0) {
         return -result;
     }
@@ -807,6 +819,22 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
 
 int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
     long result = __syscall3(SYS_recvmsg_core, fd, (long)hdr, flags);
+    if (sc_enosys(result)) {
+        if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
+            return ENOSYS;
+        }
+        if (hdr->msg_control && hdr->msg_controllen) {
+            return ENOSYS;
+        }
+
+        struct iovec *iov = hdr->msg_iov;
+        socklen_t addrlen = hdr->msg_namelen;
+        result = __syscall6(SYS_recvfrom_core, fd, (long)iov[0].iov_base, iov[0].iov_len,
+                            flags, (long)hdr->msg_name, (long)&addrlen);
+        if (!sc_failed(result)) {
+            hdr->msg_namelen = addrlen;
+        }
+    }
     if (result < 0) {
         return -result;
     }
