@@ -757,6 +757,14 @@ int sys_socket(int domain, int type, int protocol, int *fd) {
     return 0;
 }
 
+int sys_socketpair(int domain, int type_and_flags, int proto, int *fds) {
+    long result = __syscall4(SYS_socketpair_core, domain, type_and_flags, proto, (long)fds);
+    if (result < 0) {
+        return -result;
+    }
+    return 0;
+}
+
 int sys_bind(int fd, const struct sockaddr *addr, socklen_t addrlen) {
     long result = __syscall3(SYS_bind_core, fd, (long)addr, addrlen);
     if (result < 0) {
