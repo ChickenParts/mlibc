@@ -9,8 +9,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>  /* For ENOSYS, EAGAIN, etc. */
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <sys/select.h>
+#include <poll.h>
 #include <bits/winsize.h>  /* For struct winsize */
 
 #define TIOCGWINSZ 0x5413
@@ -900,6 +903,102 @@ int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_se
                 int *num_events) {
     long result = __syscall6(SYS_pselect_core, nfds, (long)read_set, (long)write_set,
                              (long)except_set, (long)timeout, (long)sigmask);
+    if (sc_enosys(result)) {
+        /* Userspace fallback to poll(2).
+         * Note: like the current epoll_pwait path, this ignores sigmask
+         * atomicity semantics for now. */
+        (void)sigmask;
+
+        if (nfds < 0 || nfds > FD_SETSIZE) {
+            return EINVAL;
+        }
+
+        int timeout_ms = -1;
+        if (timeout) {
+            if (timeout->tv_sec < 0 || timeout->tv_nsec < 0 || timeout->tv_nsec >= 1000000000L) {
+                return EINVAL;
+            }
+
+            long long ms = timeout->tv_sec * 1000LL + (timeout->tv_nsec + 999999LL) / 1000000LL;
+            if (ms > INT_MAX) {
+                timeout_ms = INT_MAX;
+            } else {
+                timeout_ms = static_cast<int>(ms);
+            }
+        }
+
+        fd_set in_read, in_write, in_except;
+        if (read_set) {
+            memcpy(&in_read, read_set, sizeof(fd_set));
+            FD_ZERO(read_set);
+        }
+        if (write_set) {
+            memcpy(&in_write, write_set, sizeof(fd_set));
+            FD_ZERO(write_set);
+        }
+        if (except_set) {
+            memcpy(&in_except, except_set, sizeof(fd_set));
+            FD_ZERO(except_set);
+        }
+
+        struct pollfd *pfds = nullptr;
+        if (nfds > 0) {
+            pfds = reinterpret_cast<struct pollfd *>(__builtin_alloca(sizeof(struct pollfd) * nfds));
+        }
+
+        int poll_count = 0;
+        for (int fd = 0; fd < nfds; fd++) {
+            short events = 0;
+            if (read_set && FD_ISSET(fd, &in_read)) {
+                events |= POLLIN;
+            }
+            if (write_set && FD_ISSET(fd, &in_write)) {
+                events |= POLLOUT;
+            }
+            if (except_set && FD_ISSET(fd, &in_except)) {
+                events |= POLLPRI;
+            }
+            if (!events) {
+                continue;
+            }
+
+            pfds[poll_count].fd = fd;
+            pfds[poll_count].events = events;
+            pfds[poll_count].revents = 0;
+            poll_count++;
+        }
+
+        result = __syscall3(SYS_poll, (long)pfds, poll_count, timeout_ms);
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+
+        int ready = 0;
+        for (int i = 0; i < poll_count; i++) {
+            short revents = pfds[i].revents;
+            bool this_fd_ready = false;
+
+            if (read_set && (revents & (POLLIN | POLLHUP))) {
+                FD_SET(pfds[i].fd, read_set);
+                this_fd_ready = true;
+            }
+            if (write_set && (revents & POLLOUT)) {
+                FD_SET(pfds[i].fd, write_set);
+                this_fd_ready = true;
+            }
+            if (except_set && (revents & (POLLPRI | POLLERR | POLLNVAL))) {
+                FD_SET(pfds[i].fd, except_set);
+                this_fd_ready = true;
+            }
+            if (this_fd_ready) {
+                ready++;
+            }
+        }
+
+        *num_events = ready;
+        return 0;
+    }
+
     if (result < 0) {
         return -result;
     }
