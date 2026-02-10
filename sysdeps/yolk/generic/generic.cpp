@@ -19,6 +19,7 @@
 #include <sys/statvfs.h>
 #include <sys/uio.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <termios.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -68,6 +69,9 @@ static inline int sc_errno(long result) {
 static inline bool sc_enosys(long result) {
 	return result == -ENOSYS;
 }
+
+/* Userspace fallback umask state until native kernel support lands. */
+static mode_t g_process_umask = 0022;
 
 static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *out) {
 	if (!in || !out) {
@@ -130,6 +134,9 @@ static void iov_scatter_bytes(const void *src, size_t src_len, const struct iove
 		}
 	}
 }
+
+/* Forward declarations for local cross-calls. */
+int sys_isatty(int fd);
 
 /* =============================================================================
  * Core System Functions
@@ -248,6 +255,9 @@ int sys_vm_protect(void *pointer, size_t size, int prot) {
  */
 
 int sys_open(const char *path, int flags, mode_t mode, int *fd) {
+    if (flags & O_CREAT) {
+        mode &= ~g_process_umask;
+    }
     long result = __syscall4(SYS_open_core, (long)path, flags, mode, AT_FDCWD);
     if (result < 0) {
         return -result;
@@ -258,6 +268,9 @@ int sys_open(const char *path, int flags, mode_t mode, int *fd) {
 
 int sys_openat(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
     /* Yolk's open takes dirfd as 4th arg */
+    if (flags & O_CREAT) {
+        mode &= ~g_process_umask;
+    }
     long result = __syscall4(SYS_open_core, (long)path, flags, mode, dirfd);
     if (result < 0) {
         return -result;
@@ -450,6 +463,28 @@ int sys_fcntl(int fd, int request, va_list args, int *result_value) {
     return 0;
 }
 
+int sys_flock(int fd, int options) {
+    struct flock fl {};
+    if (options & LOCK_UN) {
+        fl.l_type = F_UNLCK;
+    } else if (options & LOCK_EX) {
+        fl.l_type = F_WRLCK;
+    } else if (options & LOCK_SH) {
+        fl.l_type = F_RDLCK;
+    } else {
+        return EINVAL;
+    }
+
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    fl.l_pid = 0;
+
+    int cmd = (options & LOCK_NB) ? F_SETLK : F_SETLKW;
+    long result = __syscall3(SYS_fcntl, fd, cmd, (long)&fl);
+    return result < 0 ? -result : 0;
+}
+
 int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags,
              struct stat *statbuf) {
     long result;
@@ -575,6 +610,25 @@ int sys_tcflow(int fd, int action) {
     return result < 0 ? -result : 0;
 }
 
+int sys_ttyname(int fd, char *buf, size_t size) {
+    if (!buf || size == 0) {
+        return EINVAL;
+    }
+
+    int e = sys_isatty(fd);
+    if (e) {
+        return e;
+    }
+
+    static const char tty_path[] = "/dev/tty";
+    if (sizeof(tty_path) > size) {
+        return ERANGE;
+    }
+
+    memcpy(buf, tty_path, sizeof(tty_path));
+    return 0;
+}
+
 int sys_isatty(int fd) {
     /* Check if fd is a tty by attempting TIOCGWINSZ */
     struct winsize ws;
@@ -591,11 +645,13 @@ int sys_isatty(int fd) {
  */
 
 int sys_mkdir(const char *path, mode_t mode) {
+    mode &= ~g_process_umask;
     long result = __syscall2(SYS_mkdir, (long)path, mode);
     return result < 0 ? -result : 0;
 }
 
 int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
+    mode &= ~g_process_umask;
     long result = __syscall3(SYS_mkdirat_core, dirfd, (long)path, mode);
     if (sc_enosys(result) && dirfd == AT_FDCWD) {
         result = __syscall2(SYS_mkdir, (long)path, mode);
@@ -664,6 +720,17 @@ int sys_link(const char *old_path, const char *new_path) {
     return result < 0 ? -result : 0;
 }
 
+int sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new_path,
+               int flags) {
+    if (flags != 0) {
+        return EINVAL;
+    }
+    if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD) {
+        return ENOSYS;
+    }
+    return sys_link(old_path, new_path);
+}
+
 int sys_unlink(const char *path) {
     long result = __syscall1(SYS_unlink, (long)path);
     return result < 0 ? -result : 0;
@@ -688,6 +755,13 @@ int sys_symlink(const char *target_path, const char *link_path) {
     return result < 0 ? -result : 0;
 }
 
+int sys_symlinkat(const char *target_path, int dirfd, const char *link_path) {
+    if (dirfd != AT_FDCWD) {
+        return ENOSYS;
+    }
+    return sys_symlink(target_path, link_path);
+}
+
 int sys_readlink(const char *path, char *buffer, size_t max_size, ssize_t *length) {
     long result = __syscall3(SYS_readlink, (long)path, (long)buffer, max_size);
     if (result < 0) {
@@ -695,6 +769,13 @@ int sys_readlink(const char *path, char *buffer, size_t max_size, ssize_t *lengt
     }
     *length = result;
     return 0;
+}
+
+int sys_readlinkat(int dirfd, const char *path, void *buffer, size_t max_size, ssize_t *length) {
+    if (dirfd != AT_FDCWD) {
+        return ENOSYS;
+    }
+    return sys_readlink(path, static_cast<char *>(buffer), max_size, length);
 }
 
 int sys_rename(const char *old_path, const char *new_path) {
@@ -745,6 +826,22 @@ int sys_chown(const char *path, uid_t uid, gid_t gid) {
 int sys_fchown(int fd, uid_t uid, gid_t gid) {
     long result = __syscall3(SYS_fchown, fd, uid, gid);
     return result < 0 ? -result : 0;
+}
+
+int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags) {
+    if ((flags & ~(AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)) != 0) {
+        return EINVAL;
+    }
+
+    if ((flags & AT_EMPTY_PATH) && pathname && pathname[0] == '\0') {
+        return sys_fchown(dirfd, owner, group);
+    }
+
+    if (flags == 0 && dirfd == AT_FDCWD && pathname) {
+        return sys_chown(pathname, owner, group);
+    }
+
+    return ENOSYS;
 }
 
 int sys_access(const char *path, int mode) {
@@ -1544,6 +1641,15 @@ int sys_gethostname(char *buffer, size_t bufsize) {
     }
 
     memcpy(buffer, uts.nodename, len + 1);
+    return 0;
+}
+
+int sys_umask(mode_t mode, mode_t *old) {
+    mode_t previous = g_process_umask;
+    g_process_umask = mode & 0777;
+    if (old) {
+        *old = previous;
+    }
     return 0;
 }
 
