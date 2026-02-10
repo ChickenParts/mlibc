@@ -17,11 +17,20 @@
 #include <dirent.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <sys/ioctl.h>
+#include <termios.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <bits/winsize.h>  /* For struct winsize */
 
 #define TIOCGWINSZ 0x5413
+#define TCGETS    0x5401
+#define TCSETS    0x5402
+#define TCSETSW   0x5403
+#define TCSETSF   0x5404
+#define TCSBRK    0x5409
+#define TCXONC    0x540A
+#define TCFLSH    0x540B
 
 /* epoll definitions for sysdeps (avoid header dependencies during bootstrap) */
 struct epoll_event {
@@ -474,6 +483,46 @@ int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
     return 0;
 }
 
+int sys_tcgetattr(int fd, struct termios *attr) {
+    long result = __syscall3(SYS_ioctl, fd, TCGETS, (long)attr);
+    return result < 0 ? -result : 0;
+}
+
+int sys_tcsetattr(int fd, int optional_action, const struct termios *attr) {
+    int request = 0;
+    switch (optional_action) {
+        case TCSANOW:
+            request = TCSETS;
+            break;
+        case TCSADRAIN:
+            request = TCSETSW;
+            break;
+        case TCSAFLUSH:
+            request = TCSETSF;
+            break;
+        default:
+            return EINVAL;
+    }
+
+    long result = __syscall3(SYS_ioctl, fd, request, (long)attr);
+    return result < 0 ? -result : 0;
+}
+
+int sys_tcflush(int fd, int queue) {
+    long result = __syscall3(SYS_ioctl, fd, TCFLSH, queue);
+    return result < 0 ? -result : 0;
+}
+
+int sys_tcdrain(int fd) {
+    long result = __syscall3(SYS_ioctl, fd, TCSBRK, 1);
+    return result < 0 ? -result : 0;
+}
+
+int sys_tcflow(int fd, int action) {
+    long result = __syscall3(SYS_ioctl, fd, TCXONC, action);
+    return result < 0 ? -result : 0;
+}
+
 int sys_isatty(int fd) {
     /* Check if fd is a tty by attempting TIOCGWINSZ */
     struct winsize ws;
@@ -808,6 +857,10 @@ int sys_sigaction(int signum, const struct sigaction *act,
 int sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
     long result = __syscall3(SYS_sigprocmask_core, how, (long)set, (long)oldset);
     return result < 0 ? -result : 0;
+}
+
+int sys_thread_sigmask(int how, const sigset_t *set, sigset_t *oldset) {
+    return sys_sigprocmask(how, set, oldset);
 }
 
 int sys_sigpending(sigset_t *set) {
