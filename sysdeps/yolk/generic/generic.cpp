@@ -1608,6 +1608,15 @@ int sys_listen(int fd, int backlog) {
 
 int sys_accept(int fd, int *newfd, struct sockaddr *addr, socklen_t *addrlen,
                int flags) {
+    if (!newfd) {
+        return EINVAL;
+    }
+
+    int unsupported = flags & ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
+    if (unsupported) {
+        return EINVAL;
+    }
+
     long result;
     if (flags) {
         result = __syscall4(SYS_accept4_core, fd, (long)addr, (long)addrlen, flags);
