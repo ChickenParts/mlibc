@@ -137,6 +137,69 @@ static void iov_scatter_bytes(const void *src, size_t src_len, const struct iove
 	}
 }
 
+static int resolve_dirfd_path(int dirfd, const char *path, char **resolved_path) {
+	if (!path || !resolved_path) {
+		return EINVAL;
+	}
+
+	*resolved_path = nullptr;
+	if (path[0] == '\0' || path[0] == '/' || dirfd == AT_FDCWD) {
+		char *copy = strdup(path);
+		if (!copy) {
+			return ENOMEM;
+		}
+		*resolved_path = copy;
+		return 0;
+	}
+
+	int cwd_fd = -1;
+	int e = sys_open(".", O_RDONLY | O_DIRECTORY, 0, &cwd_fd);
+	if (e) {
+		return e;
+	}
+
+	e = sys_fchdir(dirfd);
+	if (e) {
+		sys_close(cwd_fd);
+		return e;
+	}
+
+	char cwd[PATH_MAX];
+	e = sys_getcwd(cwd, sizeof(cwd));
+	int restore_e = sys_fchdir(cwd_fd);
+	int close_e = sys_close(cwd_fd);
+	if (e) {
+		return e;
+	}
+	if (restore_e) {
+		return restore_e;
+	}
+	if (close_e) {
+		return close_e;
+	}
+
+	size_t cwd_len = strlen(cwd);
+	size_t path_len = strlen(path);
+	bool add_slash = (cwd_len == 0 || cwd[cwd_len - 1] != '/');
+	size_t total_len = cwd_len + (add_slash ? 1 : 0) + path_len + 1;
+
+	char *joined = static_cast<char *>(malloc(total_len));
+	if (!joined) {
+		return ENOMEM;
+	}
+
+	memcpy(joined, cwd, cwd_len);
+	size_t offset = cwd_len;
+	if (add_slash) {
+		joined[offset++] = '/';
+	}
+	memcpy(joined + offset, path, path_len);
+	joined[offset + path_len] = '\0';
+
+	*resolved_path = joined;
+	return 0;
+}
+
 /* Forward declarations for local cross-calls. */
 int sys_isatty(int fd);
 
@@ -727,13 +790,24 @@ int sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new
     if (flags != 0) {
         return EINVAL;
     }
-    if (old_path && old_path[0] == '/' && new_path && new_path[0] == '/') {
-        return sys_link(old_path, new_path);
-    }
-    if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD) {
-        return ENOSYS;
-    }
-    return sys_link(old_path, new_path);
+
+	char *old_resolved = nullptr;
+	int e = resolve_dirfd_path(olddirfd, old_path, &old_resolved);
+	if (e) {
+		return e;
+	}
+
+	char *new_resolved = nullptr;
+	e = resolve_dirfd_path(newdirfd, new_path, &new_resolved);
+	if (e) {
+		free(old_resolved);
+		return e;
+	}
+
+	int link_e = sys_link(old_resolved, new_resolved);
+	free(old_resolved);
+	free(new_resolved);
+	return link_e;
 }
 
 int sys_unlink(const char *path) {
@@ -761,13 +835,14 @@ int sys_symlink(const char *target_path, const char *link_path) {
 }
 
 int sys_symlinkat(const char *target_path, int dirfd, const char *link_path) {
-    if (link_path && link_path[0] == '/') {
-        return sys_symlink(target_path, link_path);
-    }
-    if (dirfd != AT_FDCWD) {
-        return ENOSYS;
-    }
-    return sys_symlink(target_path, link_path);
+	char *resolved = nullptr;
+	int e = resolve_dirfd_path(dirfd, link_path, &resolved);
+	if (e) {
+		return e;
+	}
+	int symlink_e = sys_symlink(target_path, resolved);
+	free(resolved);
+	return symlink_e;
 }
 
 int sys_readlink(const char *path, char *buffer, size_t max_size, ssize_t *length) {
@@ -780,13 +855,14 @@ int sys_readlink(const char *path, char *buffer, size_t max_size, ssize_t *lengt
 }
 
 int sys_readlinkat(int dirfd, const char *path, void *buffer, size_t max_size, ssize_t *length) {
-    if (path && path[0] == '/') {
-        return sys_readlink(path, static_cast<char *>(buffer), max_size, length);
-    }
-    if (dirfd != AT_FDCWD) {
-        return ENOSYS;
-    }
-    return sys_readlink(path, static_cast<char *>(buffer), max_size, length);
+	char *resolved = nullptr;
+	int e = resolve_dirfd_path(dirfd, path, &resolved);
+	if (e) {
+		return e;
+	}
+	int readlink_e = sys_readlink(resolved, static_cast<char *>(buffer), max_size, length);
+	free(resolved);
+	return readlink_e;
 }
 
 int sys_rename(const char *old_path, const char *new_path) {
@@ -848,18 +924,18 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
         return sys_fchown(dirfd, owner, group);
     }
 
-    if (pathname && pathname[0] == '/') {
-        if (flags & AT_SYMLINK_NOFOLLOW) {
-            return ENOSYS;
-        }
-        return sys_chown(pathname, owner, group);
-    }
+	if (flags & AT_SYMLINK_NOFOLLOW) {
+		return ENOSYS;
+	}
 
-    if (flags == 0 && dirfd == AT_FDCWD && pathname) {
-        return sys_chown(pathname, owner, group);
-    }
-
-    return ENOSYS;
+	char *resolved = nullptr;
+	int e = resolve_dirfd_path(dirfd, pathname, &resolved);
+	if (e) {
+		return e;
+	}
+	int chown_e = sys_chown(resolved, owner, group);
+	free(resolved);
+	return chown_e;
 }
 
 int sys_access(const char *path, int mode) {
