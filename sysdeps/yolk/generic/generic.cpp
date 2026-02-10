@@ -252,12 +252,80 @@ int sys_read(int fd, void *buf, size_t count, ssize_t *bytes_read) {
     return 0;
 }
 
+int sys_readv(int fd, const struct iovec *iovs, int iovc, ssize_t *bytes_read) {
+    if (iovc < 0 || (!iovs && iovc > 0) || !bytes_read) {
+        return EINVAL;
+    }
+
+    ssize_t total = 0;
+    for (int i = 0; i < iovc; i++) {
+        if (!iovs[i].iov_base && iovs[i].iov_len) {
+            return EINVAL;
+        }
+        if (!iovs[i].iov_len) {
+            continue;
+        }
+
+        ssize_t got = 0;
+        int e = sys_read(fd, iovs[i].iov_base, iovs[i].iov_len, &got);
+        if (e) {
+            if (total > 0) {
+                *bytes_read = total;
+                return 0;
+            }
+            return e;
+        }
+
+        total += got;
+        if (static_cast<size_t>(got) < iovs[i].iov_len) {
+            break;
+        }
+    }
+
+    *bytes_read = total;
+    return 0;
+}
+
 int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
     long result = __syscall3(SYS_write, fd, (long)buf, count);
     if (result < 0) {
         return -result;
     }
     *bytes_written = result;
+    return 0;
+}
+
+int sys_writev(int fd, const struct iovec *iovs, int iovc, ssize_t *bytes_written) {
+    if (iovc < 0 || (!iovs && iovc > 0) || !bytes_written) {
+        return EINVAL;
+    }
+
+    ssize_t total = 0;
+    for (int i = 0; i < iovc; i++) {
+        if (!iovs[i].iov_base && iovs[i].iov_len) {
+            return EINVAL;
+        }
+        if (!iovs[i].iov_len) {
+            continue;
+        }
+
+        ssize_t wrote = 0;
+        int e = sys_write(fd, iovs[i].iov_base, iovs[i].iov_len, &wrote);
+        if (e) {
+            if (total > 0) {
+                *bytes_written = total;
+                return 0;
+            }
+            return e;
+        }
+
+        total += wrote;
+        if (static_cast<size_t>(wrote) < iovs[i].iov_len) {
+            break;
+        }
+    }
+
+    *bytes_written = total;
     return 0;
 }
 
@@ -268,6 +336,58 @@ int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) {
     }
     *new_offset = result;
     return 0;
+}
+
+int sys_pread(int fd, void *buf, size_t n, off_t off, ssize_t *bytes_read) {
+    if (!bytes_read) {
+        return EINVAL;
+    }
+
+    off_t original = 0;
+    int e = sys_seek(fd, 0, SEEK_CUR, &original);
+    if (e) {
+        return e;
+    }
+
+    off_t ignored = 0;
+    e = sys_seek(fd, off, SEEK_SET, &ignored);
+    if (e) {
+        return e;
+    }
+
+    int io_err = sys_read(fd, buf, n, bytes_read);
+    int restore_err = sys_seek(fd, original, SEEK_SET, &ignored);
+
+    if (io_err) {
+        return io_err;
+    }
+    return restore_err;
+}
+
+int sys_pwrite(int fd, const void *buf, size_t n, off_t off, ssize_t *bytes_written) {
+    if (!bytes_written) {
+        return EINVAL;
+    }
+
+    off_t original = 0;
+    int e = sys_seek(fd, 0, SEEK_CUR, &original);
+    if (e) {
+        return e;
+    }
+
+    off_t ignored = 0;
+    e = sys_seek(fd, off, SEEK_SET, &ignored);
+    if (e) {
+        return e;
+    }
+
+    int io_err = sys_write(fd, buf, n, bytes_written);
+    int restore_err = sys_seek(fd, original, SEEK_SET, &ignored);
+
+    if (io_err) {
+        return io_err;
+    }
+    return restore_err;
 }
 
 int sys_dup(int fd, int flags, int *newfd) {
@@ -337,6 +457,10 @@ int sys_truncate(const char *path, size_t size) {
 int sys_fsync(int fd) {
     long result = __syscall1(SYS_fsync, fd);
     return result < 0 ? -result : 0;
+}
+
+int sys_fdatasync(int fd) {
+    return sys_fsync(fd);
 }
 
 int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
@@ -1296,6 +1420,26 @@ int sys_environ(char ***envp) {
 int sys_uname(struct utsname *buf) {
     long result = __syscall1(SYS_uname, (long)buf);
     return result < 0 ? -result : 0;
+}
+
+int sys_gethostname(char *buffer, size_t bufsize) {
+    if (!buffer || bufsize == 0) {
+        return EINVAL;
+    }
+
+    struct utsname uts;
+    int e = sys_uname(&uts);
+    if (e) {
+        return e;
+    }
+
+    size_t len = strlen(uts.nodename);
+    if (len >= bufsize) {
+        return ENAMETOOLONG;
+    }
+
+    memcpy(buffer, uts.nodename, len + 1);
+    return 0;
 }
 
 }  // namespace mlibc
