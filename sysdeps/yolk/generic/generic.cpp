@@ -500,21 +500,53 @@ int sys_pwrite(int fd, const void *buf, size_t n, off_t off, ssize_t *bytes_writ
 }
 
 int sys_dup(int fd, int flags, int *newfd) {
-    (void)flags;  /* TODO: handle O_CLOEXEC */
+    if (!newfd) {
+        return EINVAL;
+    }
+    if (flags & ~O_CLOEXEC) {
+        return EINVAL;
+    }
+
     long result = __syscall1(SYS_dup, fd);
     if (result < 0) {
         return -result;
     }
-    *newfd = result;
+
+    int duplicated = static_cast<int>(result);
+    if (flags & O_CLOEXEC) {
+        long cloexec_result = __syscall3(SYS_fcntl, duplicated, F_SETFD, FD_CLOEXEC);
+        if (cloexec_result < 0) {
+            __syscall1(SYS_close_core, duplicated);
+            return -cloexec_result;
+        }
+    }
+
+    *newfd = duplicated;
     return 0;
 }
 
 int sys_dup2(int fd, int flags, int newfd) {
-    (void)flags;  /* TODO: handle O_CLOEXEC */
+    if (flags & ~O_CLOEXEC) {
+        return EINVAL;
+    }
+    if ((flags & O_CLOEXEC) && fd == newfd) {
+        /* Match dup3 semantics used by mlibc when flags are present. */
+        return EINVAL;
+    }
+
     long result = __syscall2(SYS_dup2, fd, newfd);
     if (result < 0) {
         return -result;
     }
+
+    if (flags & O_CLOEXEC) {
+        long cloexec_result = __syscall3(SYS_fcntl, newfd, F_SETFD, FD_CLOEXEC);
+        if (cloexec_result < 0) {
+            __syscall1(SYS_close_core, newfd);
+            return -cloexec_result;
+        }
+    }
+
     return 0;
 }
 
