@@ -1476,18 +1476,48 @@ int sys_futex_wake(int *pointer) {
  * =============================================================================
  */
 
+static bool g_rlimits_initialized = false;
+static struct rlimit g_rlimits[RLIMIT_NLIMITS];
+
+static void ensure_rlimits_initialized() {
+    if (g_rlimits_initialized) {
+        return;
+    }
+
+    for (int i = 0; i < RLIMIT_NLIMITS; i++) {
+        g_rlimits[i].rlim_cur = RLIM_INFINITY;
+        g_rlimits[i].rlim_max = RLIM_INFINITY;
+    }
+
+    g_rlimits_initialized = true;
+}
+
 int sys_getrlimit(int resource, struct rlimit *rlim) {
-    /* TODO: Implement resource limits in Yolk */
-    (void)resource;
-    rlim->rlim_cur = RLIM_INFINITY;
-    rlim->rlim_max = RLIM_INFINITY;
+    if (!rlim) {
+        return EINVAL;
+    }
+    if (resource < 0 || resource >= RLIMIT_NLIMITS) {
+        return EINVAL;
+    }
+
+    ensure_rlimits_initialized();
+    *rlim = g_rlimits[resource];
     return 0;
 }
 
 int sys_setrlimit(int resource, const struct rlimit *rlim) {
-    /* TODO: Implement resource limits in Yolk */
-    (void)resource;
-    (void)rlim;
+    if (!rlim) {
+        return EINVAL;
+    }
+    if (resource < 0 || resource >= RLIMIT_NLIMITS) {
+        return EINVAL;
+    }
+    if (rlim->rlim_cur > rlim->rlim_max) {
+        return EINVAL;
+    }
+
+    ensure_rlimits_initialized();
+    g_rlimits[resource] = *rlim;
     return 0;
 }
 
