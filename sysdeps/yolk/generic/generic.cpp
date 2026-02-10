@@ -1864,10 +1864,6 @@ int sys_ppoll(struct pollfd *fds, nfds_t count, const struct timespec *timeout,
               const sigset_t *sigmask, int *num_events) {
     long result = __syscall4(SYS_ppoll_core, (long)fds, (long)count, (long)timeout, (long)sigmask);
     if (sc_enosys(result)) {
-        /* Userspace fallback to poll(2). This intentionally ignores atomic
-         * signal-mask switching semantics for now, matching current pselect fallback. */
-        (void)sigmask;
-
         int timeout_ms = -1;
         if (timeout) {
             if (timeout->tv_sec < 0 || timeout->tv_nsec < 0 || timeout->tv_nsec >= 1000000000L) {
@@ -1882,7 +1878,36 @@ int sys_ppoll(struct pollfd *fds, nfds_t count, const struct timespec *timeout,
             }
         }
 
+        sigset_t old_mask {};
+        bool mask_swapped = false;
+        if (sigmask) {
+            int e = sys_thread_sigmask(SIG_SETMASK, sigmask, &old_mask);
+            if (e) {
+                return e;
+            }
+            mask_swapped = true;
+        }
+
         result = __syscall3(SYS_poll, (long)fds, (long)count, timeout_ms);
+
+        int err = 0;
+        if (sc_failed(result)) {
+            err = sc_errno(result);
+        }
+
+        if (mask_swapped) {
+            int restore_err = sys_thread_sigmask(SIG_SETMASK, &old_mask, nullptr);
+            if (!err && restore_err) {
+                err = restore_err;
+            }
+        }
+
+        if (err) {
+            return err;
+        }
+
+        *num_events = result;
+        return 0;
     }
 
     if (sc_failed(result)) {
@@ -1898,10 +1923,7 @@ int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_se
     long result = __syscall6(SYS_pselect_core, nfds, (long)read_set, (long)write_set,
                              (long)except_set, (long)timeout, (long)sigmask);
     if (sc_enosys(result)) {
-        /* Userspace fallback to poll(2).
-         * Note: like the current epoll_pwait path, this ignores sigmask
-         * atomicity semantics for now. */
-        (void)sigmask;
+        /* Userspace fallback to ppoll(2)-style behavior with signal-mask swap. */
 
         if (nfds < 0 || nfds > FD_SETSIZE) {
             return EINVAL;
