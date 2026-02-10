@@ -1758,6 +1758,9 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
         if (sc_failed(result)) {
             return sc_errno(result);
         }
+        if (static_cast<size_t>(result) > total) {
+            return EIO;
+        }
         *length = result;
         return 0;
     }
@@ -1832,6 +1835,7 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
             return sc_errno(result);
         }
         hdr->msg_namelen = addrlen;
+        hdr->msg_controllen = 0;
         hdr->msg_flags = 0;
         *length = result;
         return 0;
@@ -1866,11 +1870,21 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
             return sc_errno(result);
         }
 
+        if (static_cast<size_t>(result) > total) {
+            if (tmp) {
+                free(tmp);
+            }
+            return EIO;
+        }
+
         if (tmp && result > 0) {
             iov_scatter_bytes(tmp, static_cast<size_t>(result), hdr->msg_iov, hdr->msg_iovlen);
+        }
+        if (tmp) {
             free(tmp);
         }
         hdr->msg_namelen = addrlen;
+        hdr->msg_controllen = 0;
         hdr->msg_flags = 0;
         *length = result;
         return 0;
@@ -1891,6 +1905,7 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         return sc_errno(result);
     }
     hdr->msg_namelen = addrlen;
+    hdr->msg_controllen = 0;
     hdr->msg_flags = 0;
     *length = result;
     return 0;
@@ -1916,6 +1931,9 @@ int sys_getsockopt(int fd, int layer, int number, void *__restrict buffer,
 
 int sys_sockname(int fd, struct sockaddr *addr, socklen_t max_addr_length,
                  socklen_t *actual_addr_length) {
+    if (!actual_addr_length) {
+        return EINVAL;
+    }
     *actual_addr_length = max_addr_length;
     long result = __syscall3(SYS_getsockname_core, fd, (long)addr, (long)actual_addr_length);
     if (result < 0) {
@@ -1926,6 +1944,9 @@ int sys_sockname(int fd, struct sockaddr *addr, socklen_t max_addr_length,
 
 int sys_peername(int fd, struct sockaddr *addr, socklen_t max_addr_length,
                  socklen_t *actual_addr_length) {
+    if (!actual_addr_length) {
+        return EINVAL;
+    }
     *actual_addr_length = max_addr_length;
     long result = __syscall3(SYS_getpeername_core, fd, (long)addr, (long)actual_addr_length);
     if (result < 0) {
@@ -1937,6 +1958,9 @@ int sys_peername(int fd, struct sockaddr *addr, socklen_t max_addr_length,
 ssize_t sys_sendto(int fd, const void *buf, size_t len, int flags,
                    const struct sockaddr *dest_addr, socklen_t addrlen,
                    ssize_t *bytes_sent) {
+    if (!bytes_sent) {
+        return EINVAL;
+    }
     long result = __syscall6(SYS_sendto_core, fd, (long)buf, len, flags,
                              (long)dest_addr, addrlen);
     if (result < 0) {
@@ -1949,6 +1973,9 @@ ssize_t sys_sendto(int fd, const void *buf, size_t len, int flags,
 ssize_t sys_recvfrom(int fd, void *buf, size_t len, int flags,
                      struct sockaddr *src_addr, socklen_t *addrlen,
                      ssize_t *bytes_recv) {
+    if (!bytes_recv) {
+        return EINVAL;
+    }
     long result = __syscall6(SYS_recvfrom_core, fd, (long)buf, len, flags,
                              (long)src_addr, (long)addrlen);
     if (result < 0) {
@@ -2479,7 +2506,7 @@ int sys_getloadavg(double *samples) {
     samples[0] = 0.0;
     samples[1] = 0.0;
     samples[2] = 0.0;
-    return ENOSYS;
+    return 0;
 }
 
 int sys_if_indextoname(unsigned int index, char *name) {
