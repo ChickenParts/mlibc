@@ -727,6 +727,9 @@ int sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new
     if (flags != 0) {
         return EINVAL;
     }
+    if (old_path && old_path[0] == '/' && new_path && new_path[0] == '/') {
+        return sys_link(old_path, new_path);
+    }
     if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD) {
         return ENOSYS;
     }
@@ -758,6 +761,9 @@ int sys_symlink(const char *target_path, const char *link_path) {
 }
 
 int sys_symlinkat(const char *target_path, int dirfd, const char *link_path) {
+    if (link_path && link_path[0] == '/') {
+        return sys_symlink(target_path, link_path);
+    }
     if (dirfd != AT_FDCWD) {
         return ENOSYS;
     }
@@ -774,6 +780,9 @@ int sys_readlink(const char *path, char *buffer, size_t max_size, ssize_t *lengt
 }
 
 int sys_readlinkat(int dirfd, const char *path, void *buffer, size_t max_size, ssize_t *length) {
+    if (path && path[0] == '/') {
+        return sys_readlink(path, static_cast<char *>(buffer), max_size, length);
+    }
     if (dirfd != AT_FDCWD) {
         return ENOSYS;
     }
@@ -837,6 +846,13 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
 
     if ((flags & AT_EMPTY_PATH) && pathname && pathname[0] == '\0') {
         return sys_fchown(dirfd, owner, group);
+    }
+
+    if (pathname && pathname[0] == '/') {
+        if (flags & AT_SYMLINK_NOFOLLOW) {
+            return ENOSYS;
+        }
+        return sys_chown(pathname, owner, group);
     }
 
     if (flags == 0 && dirfd == AT_FDCWD && pathname) {
@@ -1030,22 +1046,62 @@ int sys_getpriority(int which, id_t who, int *value) {
     if (!value) {
         return EINVAL;
     }
-    if (which != PRIO_PROCESS) {
-        return ENOSYS;
+    pid_t pgrp = 0;
+    if (which == PRIO_PGRP) {
+        int e = sys_getpgid(0, &pgrp);
+        if (e) {
+            return e;
+        }
     }
-    if (who != 0 && (pid_t)who != sys_getpid()) {
-        return ESRCH;
+    switch (which) {
+    case PRIO_PROCESS:
+        if (who != 0 && (pid_t)who != sys_getpid()) {
+            return ESRCH;
+        }
+        break;
+    case PRIO_PGRP:
+        if (who != 0 && (pid_t)who != pgrp) {
+            return ESRCH;
+        }
+        break;
+    case PRIO_USER:
+        if (who != 0 && (uid_t)who != sys_getuid()) {
+            return ESRCH;
+        }
+        break;
+    default:
+        return EINVAL;
     }
     *value = g_process_nice;
     return 0;
 }
 
 int sys_setpriority(int which, id_t who, int prio) {
-    if (which != PRIO_PROCESS) {
-        return ENOSYS;
+    pid_t pgrp = 0;
+    if (which == PRIO_PGRP) {
+        int e = sys_getpgid(0, &pgrp);
+        if (e) {
+            return e;
+        }
     }
-    if (who != 0 && (pid_t)who != sys_getpid()) {
-        return ESRCH;
+    switch (which) {
+    case PRIO_PROCESS:
+        if (who != 0 && (pid_t)who != sys_getpid()) {
+            return ESRCH;
+        }
+        break;
+    case PRIO_PGRP:
+        if (who != 0 && (pid_t)who != pgrp) {
+            return ESRCH;
+        }
+        break;
+    case PRIO_USER:
+        if (who != 0 && (uid_t)who != sys_getuid()) {
+            return ESRCH;
+        }
+        break;
+    default:
+        return EINVAL;
     }
     if (prio < PRIO_MIN) prio = PRIO_MIN;
     if (prio > PRIO_MAX) prio = PRIO_MAX;
