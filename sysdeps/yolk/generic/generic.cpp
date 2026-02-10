@@ -896,11 +896,17 @@ int sys_fchmod(int fd, mode_t mode) {
 
 int sys_fchmodat(int dirfd, const char *path, mode_t mode, int flags) {
     long result = __syscall4(SYS_fchmodat_core, dirfd, (long)path, mode, flags);
-    if (sc_enosys(result) && dirfd == AT_FDCWD) {
+    if (sc_enosys(result)) {
         if (flags != 0) {
             return EINVAL;
         }
-        result = __syscall2(SYS_chmod, (long)path, mode);
+		char *resolved = nullptr;
+		int e = resolve_dirfd_path(dirfd, path, &resolved);
+		if (e) {
+			return e;
+		}
+        result = __syscall2(SYS_chmod, (long)resolved, mode);
+		free(resolved);
     }
     return sc_failed(result) ? sc_errno(result) : 0;
 }
@@ -945,11 +951,17 @@ int sys_access(const char *path, int mode) {
 
 int sys_faccessat(int dirfd, const char *pathname, int mode, int flags) {
     long result = __syscall4(SYS_faccessat_core, dirfd, (long)pathname, mode, flags);
-    if (sc_enosys(result) && dirfd == AT_FDCWD) {
+    if (sc_enosys(result)) {
         if (flags != 0) {
             return EINVAL;
         }
-        result = __syscall2(SYS_access, (long)pathname, mode);
+		char *resolved = nullptr;
+		int e = resolve_dirfd_path(dirfd, pathname, &resolved);
+		if (e) {
+			return e;
+		}
+        result = __syscall2(SYS_access, (long)resolved, mode);
+		free(resolved);
     }
     return sc_failed(result) ? sc_errno(result) : 0;
 }
@@ -957,13 +969,24 @@ int sys_faccessat(int dirfd, const char *pathname, int mode, int flags) {
 int sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2],
                   int flags) {
     long result = __syscall4(SYS_utimensat_core, dirfd, (long)pathname, (long)times, flags);
-    if (sc_enosys(result) && dirfd == AT_FDCWD && pathname && flags == 0) {
-        struct timeval tv[2];
-        tv[0].tv_sec = times[0].tv_sec;
-        tv[0].tv_usec = times[0].tv_nsec / 1000;
-        tv[1].tv_sec = times[1].tv_sec;
-        tv[1].tv_usec = times[1].tv_nsec / 1000;
-        result = __syscall2(SYS_utimes, (long)pathname, (long)tv);
+    if (sc_enosys(result) && pathname && flags == 0) {
+		char *resolved = nullptr;
+		int e = resolve_dirfd_path(dirfd, pathname, &resolved);
+		if (e) {
+			return e;
+		}
+
+		struct timeval tv[2];
+		struct timeval *tv_ptr = nullptr;
+		if (times) {
+			tv[0].tv_sec = times[0].tv_sec;
+			tv[0].tv_usec = times[0].tv_nsec / 1000;
+			tv[1].tv_sec = times[1].tv_sec;
+			tv[1].tv_usec = times[1].tv_nsec / 1000;
+			tv_ptr = tv;
+		}
+        result = __syscall2(SYS_utimes, (long)resolved, (long)tv_ptr);
+		free(resolved);
     }
     return sc_failed(result) ? sc_errno(result) : 0;
 }
