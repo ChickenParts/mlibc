@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/select.h>
+#include <dirent.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <fcntl.h>
@@ -398,6 +399,25 @@ int sys_chdir(const char *path) {
 int sys_fchdir(int fd) {
     long result = __syscall1(SYS_fchdir, fd);
     return result < 0 ? -result : 0;
+}
+
+int sys_open_dir(const char *path, int *handle) {
+    return sys_open(path, O_RDONLY | O_DIRECTORY, 0, handle);
+}
+
+int sys_read_entries(int handle, void *buffer, size_t max_size, size_t *bytes_read) {
+    if (!bytes_read) {
+        return EINVAL;
+    }
+
+    long result = __syscall3(SYS_getdents, handle, (long)buffer, max_size);
+    if (sc_failed(result)) {
+        return sc_errno(result);
+    }
+
+    /* Kernel returns entry count; mlibc dirent core expects byte count. */
+    *bytes_read = static_cast<size_t>(result) * sizeof(struct dirent);
+    return 0;
 }
 
 int sys_readdir(int fd, struct dirent *entry, size_t max_size) {
