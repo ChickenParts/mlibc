@@ -767,12 +767,40 @@ int sys_read_entries(int handle, void *buffer, size_t max_size, size_t *bytes_re
 }
 
 int sys_readdir(int fd, struct dirent *entry, size_t max_size) {
-    /* Yolk's getdents returns linux_dirent64 format */
-    /* For now, read one entry at a time */
-    (void)fd;
-    (void)entry;
-    (void)max_size;
-    return ENOSYS;  /* TODO: Implement properly */
+	if (!entry || max_size < sizeof(struct dirent)) {
+		return EINVAL;
+	}
+
+	void *buf = malloc(max_size);
+	if (!buf) {
+		return ENOMEM;
+	}
+
+	size_t bytes_read = 0;
+	int e = sys_read_entries(fd, buf, max_size, &bytes_read);
+	if (e) {
+		free(buf);
+		return e;
+	}
+	if (bytes_read == 0) {
+		free(buf);
+		return ENOENT;
+	}
+
+	struct dirent *first = static_cast<struct dirent *>(buf);
+	size_t reclen = first->d_reclen;
+	if (reclen == 0 || reclen > bytes_read) {
+		free(buf);
+		return EIO;
+	}
+	if (reclen > max_size) {
+		reclen = max_size;
+	}
+
+	memset(entry, 0, max_size);
+	memcpy(entry, first, reclen);
+	free(buf);
+	return 0;
 }
 
 /* =============================================================================
