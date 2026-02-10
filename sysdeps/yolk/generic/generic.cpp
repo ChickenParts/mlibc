@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/select.h>
+#include <sys/resource.h>
 #include <dirent.h>
 #include <sys/socket.h>
 #include <sys/statvfs.h>
@@ -72,6 +73,7 @@ static inline bool sc_enosys(long result) {
 
 /* Userspace fallback umask state until native kernel support lands. */
 static mode_t g_process_umask = 0022;
+static int g_process_nice = 0;
 
 static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *out) {
 	if (!in || !out) {
@@ -905,6 +907,162 @@ gid_t sys_getegid() {
 
 pid_t sys_gettid() {
     return __syscall0(SYS_gettid_core);
+}
+
+int sys_setuid(uid_t uid) {
+    uid_t cur = sys_getuid();
+    return (uid == cur) ? 0 : EPERM;
+}
+
+int sys_seteuid(uid_t euid) {
+    uid_t cur = sys_geteuid();
+    return (euid == cur) ? 0 : EPERM;
+}
+
+int sys_setgid(gid_t gid) {
+    gid_t cur = sys_getgid();
+    return (gid == cur) ? 0 : EPERM;
+}
+
+int sys_setegid(gid_t egid) {
+    gid_t cur = sys_getegid();
+    return (egid == cur) ? 0 : EPERM;
+}
+
+int sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid) {
+    if (!ruid || !euid || !suid) {
+        return EINVAL;
+    }
+    uid_t uid = sys_getuid();
+    uid_t euid_cur = sys_geteuid();
+    *ruid = uid;
+    *euid = euid_cur;
+    *suid = euid_cur;
+    return 0;
+}
+
+int sys_getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid) {
+    if (!rgid || !egid || !sgid) {
+        return EINVAL;
+    }
+    gid_t gid = sys_getgid();
+    gid_t egid_cur = sys_getegid();
+    *rgid = gid;
+    *egid = egid_cur;
+    *sgid = egid_cur;
+    return 0;
+}
+
+int sys_setreuid(uid_t ruid, uid_t euid) {
+    uid_t cur_r = sys_getuid();
+    uid_t cur_e = sys_geteuid();
+    if ((ruid != (uid_t)-1 && ruid != cur_r) ||
+        (euid != (uid_t)-1 && euid != cur_e)) {
+        return EPERM;
+    }
+    return 0;
+}
+
+int sys_setregid(gid_t rgid, gid_t egid) {
+    gid_t cur_r = sys_getgid();
+    gid_t cur_e = sys_getegid();
+    if ((rgid != (gid_t)-1 && rgid != cur_r) ||
+        (egid != (gid_t)-1 && egid != cur_e)) {
+        return EPERM;
+    }
+    return 0;
+}
+
+int sys_setresuid(uid_t ruid, uid_t euid, uid_t suid) {
+    uid_t cur_r = sys_getuid();
+    uid_t cur_e = sys_geteuid();
+    if ((ruid != (uid_t)-1 && ruid != cur_r) ||
+        (euid != (uid_t)-1 && euid != cur_e) ||
+        (suid != (uid_t)-1 && suid != cur_e)) {
+        return EPERM;
+    }
+    return 0;
+}
+
+int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
+    gid_t cur_r = sys_getgid();
+    gid_t cur_e = sys_getegid();
+    if ((rgid != (gid_t)-1 && rgid != cur_r) ||
+        (egid != (gid_t)-1 && egid != cur_e) ||
+        (sgid != (gid_t)-1 && sgid != cur_e)) {
+        return EPERM;
+    }
+    return 0;
+}
+
+int sys_getgroups(size_t size, gid_t *list, int *ret) {
+    if (!ret) {
+        return EINVAL;
+    }
+    gid_t gid = sys_getgid();
+    if (size == 0) {
+        *ret = 1;
+        return 0;
+    }
+    if (!list) {
+        return EINVAL;
+    }
+    list[0] = gid;
+    *ret = 1;
+    return 0;
+}
+
+int sys_setgroups(size_t size, const gid_t *list) {
+    if (size == 0) {
+        return 0;
+    }
+    if (!list) {
+        return EINVAL;
+    }
+    gid_t cur = sys_getgid();
+    if (size == 1 && list[0] == cur) {
+        return 0;
+    }
+    return EPERM;
+}
+
+int sys_getpriority(int which, id_t who, int *value) {
+    if (!value) {
+        return EINVAL;
+    }
+    if (which != PRIO_PROCESS) {
+        return ENOSYS;
+    }
+    if (who != 0 && (pid_t)who != sys_getpid()) {
+        return ESRCH;
+    }
+    *value = g_process_nice;
+    return 0;
+}
+
+int sys_setpriority(int which, id_t who, int prio) {
+    if (which != PRIO_PROCESS) {
+        return ENOSYS;
+    }
+    if (who != 0 && (pid_t)who != sys_getpid()) {
+        return ESRCH;
+    }
+    if (prio < PRIO_MIN) prio = PRIO_MIN;
+    if (prio > PRIO_MAX) prio = PRIO_MAX;
+    g_process_nice = prio;
+    return 0;
+}
+
+int sys_nice(int nice, int *new_nice) {
+    if (!new_nice) {
+        return EINVAL;
+    }
+    int prio = g_process_nice + nice;
+    if (prio < PRIO_MIN) prio = PRIO_MIN;
+    if (prio > PRIO_MAX) prio = PRIO_MAX;
+    g_process_nice = prio;
+    *new_nice = g_process_nice;
+    return 0;
 }
 
 int sys_setpgid(pid_t pid, pid_t pgid) {
