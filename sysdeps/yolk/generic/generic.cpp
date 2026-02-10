@@ -925,7 +925,7 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
     }
 
 	if (flags & AT_SYMLINK_NOFOLLOW) {
-		return ENOSYS;
+		return EOPNOTSUPP;
 	}
 
 	char *resolved = nullptr;
@@ -1554,14 +1554,14 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
         return 0;
     }
 
-    long result = __syscall3(SYS_sendmsg_core, fd, (long)hdr, flags);
-    if (sc_enosys(result)) {
-        if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
-            return ENOSYS;
-        }
-        if (hdr->msg_control && hdr->msg_controllen) {
-            return ENOSYS;
-        }
+	long result = __syscall3(SYS_sendmsg_core, fd, (long)hdr, flags);
+	if (sc_enosys(result)) {
+		if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
+			return EINVAL;
+		}
+		if (hdr->msg_control && hdr->msg_controllen) {
+			return EOPNOTSUPP;
+		}
 
         const struct iovec *iov = hdr->msg_iov;
         result = __syscall6(SYS_sendto_core, fd, (long)iov[0].iov_base, iov[0].iov_len,
@@ -1624,14 +1624,14 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         return 0;
     }
 
-    long result = __syscall3(SYS_recvmsg_core, fd, (long)hdr, flags);
-    if (sc_enosys(result)) {
-        if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
-            return ENOSYS;
-        }
-        if (hdr->msg_control && hdr->msg_controllen) {
-            return ENOSYS;
-        }
+	long result = __syscall3(SYS_recvmsg_core, fd, (long)hdr, flags);
+	if (sc_enosys(result)) {
+		if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
+			return EINVAL;
+		}
+		if (hdr->msg_control && hdr->msg_controllen) {
+			return EOPNOTSUPP;
+		}
 
         struct iovec *iov = hdr->msg_iov;
         socklen_t addrlen = hdr->msg_namelen;
