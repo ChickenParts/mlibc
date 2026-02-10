@@ -1966,11 +1966,33 @@ int sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
 
 int sys_epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
                     int timeout, const sigset_t *sigmask, int *raised) {
-    (void)sigmask;  /* TODO: sigmask support in kernel */
-    long result = __syscall4(SYS_epoll_wait_core, epfd, (long)events, maxevents, timeout);
-    if (result < 0) {
-        return -result;
+    sigset_t old_mask {};
+    bool mask_swapped = false;
+    if (sigmask) {
+        int e = sys_thread_sigmask(SIG_SETMASK, sigmask, &old_mask);
+        if (e) {
+            return e;
+        }
+        mask_swapped = true;
     }
+
+    long result = __syscall4(SYS_epoll_wait_core, epfd, (long)events, maxevents, timeout);
+    int err = 0;
+    if (result < 0) {
+        err = -result;
+    }
+
+    if (mask_swapped) {
+        int restore_err = sys_thread_sigmask(SIG_SETMASK, &old_mask, nullptr);
+        if (!err && restore_err) {
+            return restore_err;
+        }
+    }
+
+    if (err) {
+        return err;
+    }
+
     *raised = result;
     return 0;
 }
