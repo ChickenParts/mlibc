@@ -8,11 +8,15 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>  /* For ENOSYS, EAGAIN, etc. */
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <bits/winsize.h>  /* For struct winsize */
 
@@ -51,6 +55,48 @@ static inline int sc_errno(long result) {
 
 static inline bool sc_enosys(long result) {
 	return result == -ENOSYS;
+}
+
+static int iov_total_length(const struct iovec *iov, size_t iovlen, size_t *total_out) {
+	if (!total_out) {
+		return EINVAL;
+	}
+	size_t total = 0;
+	for (size_t i = 0; i < iovlen; i++) {
+		if (iov[i].iov_len > SIZE_MAX - total) {
+			return EINVAL;
+		}
+		total += iov[i].iov_len;
+	}
+	*total_out = total;
+	return 0;
+}
+
+static void iov_gather_bytes(void *dst, const struct iovec *iov, size_t iovlen) {
+	uint8_t *out = reinterpret_cast<uint8_t *>(dst);
+	for (size_t i = 0; i < iovlen; i++) {
+		if (iov[i].iov_len == 0) {
+			continue;
+		}
+		memcpy(out, iov[i].iov_base, iov[i].iov_len);
+		out += iov[i].iov_len;
+	}
+}
+
+static void iov_scatter_bytes(const void *src, size_t src_len, const struct iovec *iov, size_t iovlen) {
+	const uint8_t *in = reinterpret_cast<const uint8_t *>(src);
+	size_t remaining = src_len;
+	for (size_t i = 0; i < iovlen && remaining > 0; i++) {
+		size_t n = iov[i].iov_len;
+		if (n > remaining) {
+			n = remaining;
+		}
+		if (n > 0) {
+			memcpy(iov[i].iov_base, in, n);
+			in += n;
+			remaining -= n;
+		}
+	}
 }
 
 /* =============================================================================
@@ -786,6 +832,34 @@ int sys_accept(int fd, int *newfd, struct sockaddr *addr, socklen_t *addrlen,
     long result;
     if (flags) {
         result = __syscall4(SYS_accept4_core, fd, (long)addr, (long)addrlen, flags);
+        if (sc_enosys(result)) {
+            result = __syscall3(SYS_accept_core, fd, (long)addr, (long)addrlen);
+            if (sc_failed(result)) {
+                return sc_errno(result);
+            }
+
+            int accepted_fd = result;
+            if (flags & SOCK_NONBLOCK) {
+                long fl = __syscall3(SYS_fcntl, accepted_fd, F_GETFL, 0);
+                if (sc_failed(fl)) {
+                    __syscall1(SYS_close_core, accepted_fd);
+                    return sc_errno(fl);
+                }
+                long rc = __syscall3(SYS_fcntl, accepted_fd, F_SETFL, fl | O_NONBLOCK);
+                if (sc_failed(rc)) {
+                    __syscall1(SYS_close_core, accepted_fd);
+                    return sc_errno(rc);
+                }
+            }
+
+            if (flags & SOCK_CLOEXEC) {
+                long rc = __syscall3(SYS_fcntl, accepted_fd, F_SETFD, FD_CLOEXEC);
+                if (sc_failed(rc)) {
+                    __syscall1(SYS_close_core, accepted_fd);
+                    return sc_errno(rc);
+                }
+            }
+        }
     } else {
         result = __syscall3(SYS_accept_core, fd, (long)addr, (long)addrlen);
     }
@@ -805,6 +879,45 @@ int sys_connect(int fd, const struct sockaddr *addr, socklen_t addrlen) {
 }
 
 int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
+    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
+        long result = __syscall6(SYS_sendto_core, fd, 0, 0, flags,
+                                 (long)(hdr ? hdr->msg_name : nullptr),
+                                 (long)(hdr ? hdr->msg_namelen : 0));
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+        *length = result;
+        return 0;
+    }
+
+    if (hdr->msg_iovlen > 1 && (!hdr->msg_control || !hdr->msg_controllen)) {
+        size_t total = 0;
+        int e = iov_total_length(hdr->msg_iov, hdr->msg_iovlen, &total);
+        if (e) {
+            return e;
+        }
+
+        void *tmp = nullptr;
+        if (total > 0) {
+            tmp = malloc(total);
+            if (!tmp) {
+                return ENOMEM;
+            }
+            iov_gather_bytes(tmp, hdr->msg_iov, hdr->msg_iovlen);
+        }
+
+        long result = __syscall6(SYS_sendto_core, fd, (long)tmp, total, flags,
+                                 (long)hdr->msg_name, hdr->msg_namelen);
+        if (tmp) {
+            free(tmp);
+        }
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+        *length = result;
+        return 0;
+    }
+
     long result = __syscall3(SYS_sendmsg_core, fd, (long)hdr, flags);
     if (sc_enosys(result)) {
         if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
@@ -826,6 +939,55 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
 }
 
 int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
+    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
+        socklen_t addrlen = hdr ? hdr->msg_namelen : 0;
+        long result = __syscall6(SYS_recvfrom_core, fd, 0, 0, flags,
+                                 (long)(hdr ? hdr->msg_name : nullptr),
+                                 (long)&addrlen);
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+        if (hdr) {
+            hdr->msg_namelen = addrlen;
+        }
+        *length = result;
+        return 0;
+    }
+
+    if (hdr->msg_iovlen > 1 && (!hdr->msg_control || !hdr->msg_controllen)) {
+        size_t total = 0;
+        int e = iov_total_length(hdr->msg_iov, hdr->msg_iovlen, &total);
+        if (e) {
+            return e;
+        }
+
+        void *tmp = nullptr;
+        if (total > 0) {
+            tmp = malloc(total);
+            if (!tmp) {
+                return ENOMEM;
+            }
+        }
+
+        socklen_t addrlen = hdr->msg_namelen;
+        long result = __syscall6(SYS_recvfrom_core, fd, (long)tmp, total, flags,
+                                 (long)hdr->msg_name, (long)&addrlen);
+        if (sc_failed(result)) {
+            if (tmp) {
+                free(tmp);
+            }
+            return sc_errno(result);
+        }
+
+        if (tmp && result > 0) {
+            iov_scatter_bytes(tmp, static_cast<size_t>(result), hdr->msg_iov, hdr->msg_iovlen);
+            free(tmp);
+        }
+        hdr->msg_namelen = addrlen;
+        *length = result;
+        return 0;
+    }
+
     long result = __syscall3(SYS_recvmsg_core, fd, (long)hdr, flags);
     if (sc_enosys(result)) {
         if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
