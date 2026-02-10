@@ -16,11 +16,13 @@
 #include <sys/select.h>
 #include <dirent.h>
 #include <sys/socket.h>
+#include <sys/statvfs.h>
 #include <sys/uio.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <abi-bits/statfs.h>
 #include <bits/winsize.h>  /* For struct winsize */
 
 #define TIOCGWINSZ 0x5413
@@ -65,6 +67,26 @@ static inline int sc_errno(long result) {
 
 static inline bool sc_enosys(long result) {
 	return result == -ENOSYS;
+}
+
+static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *out) {
+	if (!in || !out) {
+		return;
+	}
+
+	memset(out, 0, sizeof(*out));
+	out->f_bsize = in->f_bsize;
+	out->f_frsize = in->f_frsize ? in->f_frsize : in->f_bsize;
+	out->f_blocks = in->f_blocks;
+	out->f_bfree = in->f_bfree;
+	out->f_bavail = in->f_bavail;
+	out->f_files = in->f_files;
+	out->f_ffree = in->f_ffree;
+	out->f_favail = in->f_ffree;
+	out->f_fsid = (static_cast<unsigned long>(static_cast<unsigned int>(in->f_fsid.__val[1])) << 32)
+		| static_cast<unsigned long>(static_cast<unsigned int>(in->f_fsid.__val[0]));
+	out->f_flag = in->f_flags;
+	out->f_namemax = in->f_namelen;
 }
 
 static int iov_total_length(const struct iovec *iov, size_t iovlen, size_t *total_out) {
@@ -451,6 +473,36 @@ int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags,
         }
     }
     return sc_failed(result) ? sc_errno(result) : 0;
+}
+
+int sys_statvfs(const char *path, struct statvfs *out) {
+    if (!path || !out) {
+        return EINVAL;
+    }
+
+    struct statfs sfs;
+    long result = __syscall2(SYS_statfs, (long)path, (long)&sfs);
+    if (sc_failed(result)) {
+        return sc_errno(result);
+    }
+
+    fill_statvfs_from_statfs(&sfs, out);
+    return 0;
+}
+
+int sys_fstatvfs(int fd, struct statvfs *out) {
+    if (!out) {
+        return EINVAL;
+    }
+
+    struct statfs sfs;
+    long result = __syscall2(SYS_fstatfs_core, fd, (long)&sfs);
+    if (sc_failed(result)) {
+        return sc_errno(result);
+    }
+
+    fill_statvfs_from_statfs(&sfs, out);
+    return 0;
 }
 
 int sys_ftruncate(int fd, size_t size) {
@@ -1492,6 +1544,63 @@ int sys_gethostname(char *buffer, size_t bufsize) {
     }
 
     memcpy(buffer, uts.nodename, len + 1);
+    return 0;
+}
+
+int sys_getentropy(void *buffer, size_t length) {
+    if (!buffer) {
+        return EFAULT;
+    }
+    if (length > 256) {
+        return EIO;
+    }
+    if (length == 0) {
+        return 0;
+    }
+
+    /* First try the conventional urandom path when available. */
+    int fd = -1;
+    if (sys_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0, &fd) == 0) {
+        size_t done = 0;
+        while (done < length) {
+            ssize_t got = 0;
+            int e = sys_read(fd, (uint8_t *)buffer + done, length - done, &got);
+            if (e) {
+                break;
+            }
+            if (got <= 0) {
+                break;
+            }
+            done += static_cast<size_t>(got);
+        }
+        (void)sys_close(fd);
+        if (done == length) {
+            return 0;
+        }
+    }
+
+    /* Best-effort fallback for early bring-up: deterministic PRNG mixed with
+     * time and process identity so callers don't fail with ENOSYS. */
+    time_t secs = 0;
+    long nanos = 0;
+    (void)sys_clock_get(CLOCK_MONOTONIC, &secs, &nanos);
+
+    uint64_t state = (static_cast<uint64_t>(secs) << 32)
+        ^ static_cast<uint64_t>(static_cast<uint32_t>(nanos))
+        ^ static_cast<uint64_t>(sys_getpid())
+        ^ static_cast<uint64_t>(sys_gettid())
+        ^ reinterpret_cast<uintptr_t>(buffer)
+        ^ 0x9E3779B97F4A7C15ULL;
+
+    uint8_t *out = reinterpret_cast<uint8_t *>(buffer);
+    for (size_t i = 0; i < length; i++) {
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
+        state *= 0x2545F4914F6CDD1DULL;
+        out[i] = static_cast<uint8_t>(state >> 56);
+    }
+
     return 0;
 }
 

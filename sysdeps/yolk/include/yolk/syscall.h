@@ -99,6 +99,7 @@
 #define SYS_waitset_create     160
 #define SYS_waitset_ctl        161
 #define SYS_waitset_wait       162
+#define SYS_fstatfs_core       163
 /* Core-Yolk alias for legacy service registration */
 #define SYS_service_register_core 96
 /* Core-Yolk aliases for legacy console control */
@@ -125,6 +126,7 @@
 #define SYS_fsync           74
 #define SYS_utimes          235
 #define SYS_statfs          137
+#define SYS_fstatfs        SYS_fstatfs_core
 #define SYS_mount           165
 #define SYS_umount          166
 #define SYS_getdents        78
