@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>  /* For ENOSYS, EAGAIN, etc. */
 #include <limits.h>
 #include <sys/types.h>
@@ -24,6 +25,16 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
+#include <ucontext.h>
+#include <sched.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/times.h>
+#include <sys/wait.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <unistd.h>
 #include <abi-bits/statfs.h>
 #include <bits/winsize.h>  /* For struct winsize */
 
@@ -35,6 +46,8 @@
 #define TCSBRK    0x5409
 #define TCXONC    0x540A
 #define TCFLSH    0x540B
+#define TIOCGPTN  0x80045430
+#define TIOCSWINSZ 0x5414
 
 /* epoll definitions for sysdeps (avoid header dependencies during bootstrap) */
 struct epoll_event {
@@ -2277,6 +2290,685 @@ int sys_getentropy(void *buffer, size_t length) {
     }
 
     return 0;
+}
+
+/* =============================================================================
+ * Compatibility Completion Layer
+ * =============================================================================
+ */
+
+int sys_before_cancellable_syscall(ucontext_t *uctx) {
+    (void)uctx;
+    return 0;
+}
+
+int sys_brk(void **out) {
+    if (!out) {
+        return EINVAL;
+    }
+    *out = nullptr;
+    return ENOSYS;
+}
+
+int sys_clock_set(int clock, time_t secs, long nanos) {
+    (void)clock;
+    (void)secs;
+    (void)nanos;
+    return ENOSYS;
+}
+
+int sys_fadvise(int fd, off_t offset, off_t length, int advice) {
+    (void)fd;
+    (void)offset;
+    (void)length;
+    (void)advice;
+    return 0;
+}
+
+int sys_fallocate(int fd, off_t offset, size_t size) {
+    if (offset < 0) {
+        return EINVAL;
+    }
+    if (size == 0) {
+        return 0;
+    }
+
+    size_t end = static_cast<size_t>(offset) + size;
+    off_t current = 0;
+    int e = sys_seek(fd, 0, SEEK_END, &current);
+    if (e) {
+        return e;
+    }
+    if (current >= static_cast<off_t>(end)) {
+        return 0;
+    }
+    return sys_ftruncate(fd, end);
+}
+
+int sys_futex_tid() {
+    return static_cast<int>(sys_gettid());
+}
+
+int sys_get_max_priority(int policy, int *out) {
+    if (!out) {
+        return EINVAL;
+    }
+    switch (policy) {
+        case SCHED_OTHER:
+            *out = 0;
+            return 0;
+        case SCHED_FIFO:
+        case SCHED_RR:
+            *out = 99;
+            return 0;
+        default:
+            return EINVAL;
+    }
+}
+
+int sys_get_min_priority(int policy, int *out) {
+    if (!out) {
+        return EINVAL;
+    }
+    switch (policy) {
+        case SCHED_OTHER:
+        case SCHED_FIFO:
+        case SCHED_RR:
+            *out = 0;
+            return 0;
+        default:
+            return EINVAL;
+    }
+}
+
+int sys_getparam(pid_t pid, struct sched_param *param) {
+    (void)pid;
+    if (!param) {
+        return EINVAL;
+    }
+    param->sched_priority = 0;
+    return 0;
+}
+
+int sys_setparam(pid_t pid, const struct sched_param *param) {
+    (void)pid;
+    if (!param) {
+        return EINVAL;
+    }
+    return 0;
+}
+
+int sys_getschedparam(void *tcb, int *policy, struct sched_param *param) {
+    (void)tcb;
+    if (!policy || !param) {
+        return EINVAL;
+    }
+    *policy = SCHED_OTHER;
+    param->sched_priority = 0;
+    return 0;
+}
+
+int sys_setschedparam(void *tcb, int policy, const struct sched_param *param) {
+    (void)tcb;
+    if (!param) {
+        return EINVAL;
+    }
+    if (policy != SCHED_OTHER && policy != SCHED_FIFO && policy != SCHED_RR) {
+        return EINVAL;
+    }
+    return 0;
+}
+
+int sys_getscheduler(pid_t pid, int *policy) {
+    (void)pid;
+    if (!policy) {
+        return EINVAL;
+    }
+    *policy = SCHED_OTHER;
+    return 0;
+}
+
+int sys_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask) {
+    (void)pid;
+    if (!mask || cpusetsize == 0) {
+        return EINVAL;
+    }
+    memset(mask, 0, cpusetsize);
+    reinterpret_cast<uint8_t *>(mask)[0] = 0x01;
+    return 0;
+}
+
+int sys_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask) {
+    (void)pid;
+    if (!mask || cpusetsize == 0) {
+        return EINVAL;
+    }
+    return 0;
+}
+
+int sys_getthreadaffinity(pid_t tid, size_t cpusetsize, cpu_set_t *mask) {
+    return sys_getaffinity(tid, cpusetsize, mask);
+}
+
+int sys_setthreadaffinity(pid_t tid, size_t cpusetsize, const cpu_set_t *mask) {
+    return sys_setaffinity(tid, cpusetsize, mask);
+}
+
+int sys_getitimer(int which, struct itimerval *curr_value) {
+    (void)which;
+    if (!curr_value) {
+        return EINVAL;
+    }
+    memset(curr_value, 0, sizeof(*curr_value));
+    return ENOSYS;
+}
+
+int sys_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value) {
+    (void)which;
+    (void)new_value;
+    if (old_value) {
+        memset(old_value, 0, sizeof(*old_value));
+    }
+    return ENOSYS;
+}
+
+int sys_getloadavg(double *samples) {
+    if (!samples) {
+        return EINVAL;
+    }
+    samples[0] = 0.0;
+    samples[1] = 0.0;
+    samples[2] = 0.0;
+    return ENOSYS;
+}
+
+int sys_if_indextoname(unsigned int index, char *name) {
+    if (!name) {
+        return EINVAL;
+    }
+    if (index == 1) {
+        strcpy(name, "lo");
+        return 0;
+    }
+    if (index == 2) {
+        strcpy(name, "eth0");
+        return 0;
+    }
+    return ENXIO;
+}
+
+int sys_if_nametoindex(const char *name, unsigned int *ret) {
+    if (!name || !ret) {
+        return EINVAL;
+    }
+    if (!strcmp(name, "lo")) {
+        *ret = 1;
+        return 0;
+    }
+    if (!strcmp(name, "eth0")) {
+        *ret = 2;
+        return 0;
+    }
+    return ENXIO;
+}
+
+int sys_inet_configured(bool *ipv4, bool *ipv6) {
+    if (ipv4) {
+        *ipv4 = true;
+    }
+    if (ipv6) {
+        *ipv6 = false;
+    }
+    return 0;
+}
+
+int sys_ioperm(unsigned long int from, unsigned long int num, int turn_on) {
+    (void)from;
+    (void)num;
+    (void)turn_on;
+    return ENOSYS;
+}
+
+int sys_iopl(int level) {
+    (void)level;
+    return ENOSYS;
+}
+
+int sys_madvise(void *addr, size_t length, int advice) {
+    (void)addr;
+    (void)length;
+    (void)advice;
+    return 0;
+}
+
+int sys_posix_madvise(void *addr, size_t length, int advice) {
+    return sys_madvise(addr, length, advice);
+}
+
+int sys_memfd_create(const char *name, int flags, int *fd) {
+    (void)name;
+    (void)flags;
+    if (!fd) {
+        return EINVAL;
+    }
+    *fd = -1;
+    return ENOSYS;
+}
+
+int sys_mincore(void *addr, size_t length, unsigned char *vec) {
+    if (!vec) {
+        return EINVAL;
+    }
+    size_t page_count = (length + 4095) / 4096;
+    memset(vec, 1, page_count);
+    (void)addr;
+    return 0;
+}
+
+int sys_mkfifoat(int dirfd, const char *path, mode_t mode) {
+    (void)dirfd;
+    (void)path;
+    (void)mode;
+    return ENOSYS;
+}
+
+int sys_mknodat(int dirfd, const char *path, int mode, int dev) {
+    (void)dirfd;
+    (void)path;
+    (void)mode;
+    (void)dev;
+    return ENOSYS;
+}
+
+int sys_mlock(const void *addr, size_t length) {
+    (void)addr;
+    (void)length;
+    return 0;
+}
+
+int sys_mlockall(int flags) {
+    (void)flags;
+    return 0;
+}
+
+int sys_msync(void *addr, size_t length, int flags) {
+    (void)addr;
+    (void)length;
+    (void)flags;
+    return 0;
+}
+
+int sys_munlock(const void *addr, size_t length) {
+    (void)addr;
+    (void)length;
+    return 0;
+}
+
+int sys_munlockall(void) {
+    return 0;
+}
+
+int sys_name_to_handle_at(int dirfd, const char *pathname, struct file_handle *handle, int *mount_id, int flags) {
+    (void)dirfd;
+    (void)pathname;
+    (void)handle;
+    (void)mount_id;
+    (void)flags;
+    return ENOSYS;
+}
+
+int sys_openpt(int oflags, int *fd) {
+    if (!fd) {
+        return EINVAL;
+    }
+    return sys_open("/dev/ptmx", oflags, 0, fd);
+}
+
+int sys_ptsname(int fd, char *buffer, size_t length) {
+    if (!buffer || length == 0) {
+        return EINVAL;
+    }
+
+    uint32_t pty_num = 0;
+    int ignored = 0;
+    if (sys_ioctl(fd, TIOCGPTN, &pty_num, &ignored) == 0) {
+        int n = snprintf(buffer, length, "/dev/pts/%u", pty_num);
+        if (n < 0 || static_cast<size_t>(n) >= length) {
+            return ERANGE;
+        }
+        return 0;
+    }
+
+    static const char fallback[] = "/dev/pts/0";
+    if (length < sizeof(fallback)) {
+        return ERANGE;
+    }
+    memcpy(buffer, fallback, sizeof(fallback));
+    return 0;
+}
+
+int sys_unlockpt(int fd) {
+    (void)fd;
+    return 0;
+}
+
+int sys_openpty(int *mfd, int *sfd, char *name, const struct termios *ios, const struct winsize *win) {
+    if (!mfd || !sfd) {
+        return EINVAL;
+    }
+
+    int e = sys_openpt(O_RDWR | O_NOCTTY, mfd);
+    if (e) {
+        return e;
+    }
+    e = sys_unlockpt(*mfd);
+    if (e) {
+        (void)sys_close(*mfd);
+        return e;
+    }
+
+    char slave_path[64];
+    e = sys_ptsname(*mfd, slave_path, sizeof(slave_path));
+    if (e) {
+        (void)sys_close(*mfd);
+        return e;
+    }
+
+    e = sys_open(slave_path, O_RDWR | O_NOCTTY, 0, sfd);
+    if (e) {
+        (void)sys_close(*mfd);
+        return e;
+    }
+
+    if (name) {
+        strcpy(name, slave_path);
+    }
+    if (ios) {
+        (void)sys_tcsetattr(*sfd, TCSANOW, ios);
+    }
+    if (win) {
+        int ignored = 0;
+        (void)sys_ioctl(*sfd, TIOCSWINSZ, (void *)win, &ignored);
+    }
+    return 0;
+}
+
+int sys_pause() {
+    sigset_t mask;
+    memset(&mask, 0, sizeof(mask));
+    return sys_sigsuspend(&mask);
+}
+
+int sys_personality(unsigned long persona, int *out) {
+    (void)persona;
+    if (!out) {
+        return EINVAL;
+    }
+    *out = 0;
+    return ENOSYS;
+}
+
+int sys_riscv_flush_icache(void *start, void *end, unsigned long flags) {
+    (void)start;
+    (void)end;
+    (void)flags;
+    return ENOSYS;
+}
+
+int sys_riscv_hwprobe(struct riscv_hwprobe *pairs, size_t pair_count, size_t cpusetsize, cpu_set_t *cpus, unsigned int flags) {
+    (void)pairs;
+    (void)pair_count;
+    (void)cpusetsize;
+    (void)cpus;
+    (void)flags;
+    return ENOSYS;
+}
+
+int sys_semctl(int semid, int semnum, int cmd, void *semun, int *ret) {
+    (void)semid;
+    (void)semnum;
+    (void)cmd;
+    (void)semun;
+    if (ret) {
+        *ret = -1;
+    }
+    return ENOSYS;
+}
+
+int sys_semget(key_t key, int n, int fl, int *id) {
+    (void)key;
+    (void)n;
+    (void)fl;
+    if (!id) {
+        return EINVAL;
+    }
+    *id = -1;
+    return ENOSYS;
+}
+
+int sys_sethostname(const char *buffer, size_t bufsize) {
+    (void)buffer;
+    (void)bufsize;
+    return ENOSYS;
+}
+
+int sys_shmat(void **seg_start, int shmid, const void *shmaddr, int shmflg) {
+    (void)shmid;
+    (void)shmaddr;
+    (void)shmflg;
+    if (!seg_start) {
+        return EINVAL;
+    }
+    *seg_start = nullptr;
+    return ENOSYS;
+}
+
+int sys_shmctl(int *idx, int shmid, int cmd, struct shmid_ds *buf) {
+    (void)shmid;
+    (void)cmd;
+    (void)buf;
+    if (idx) {
+        *idx = -1;
+    }
+    return ENOSYS;
+}
+
+int sys_shmdt(const void *shmaddr) {
+    (void)shmaddr;
+    return ENOSYS;
+}
+
+int sys_shmget(int *shm_id, key_t key, size_t size, int shmflg) {
+    (void)key;
+    (void)size;
+    (void)shmflg;
+    if (!shm_id) {
+        return EINVAL;
+    }
+    *shm_id = -1;
+    return ENOSYS;
+}
+
+int sys_sigaltstack(const stack_t *ss, stack_t *oss) {
+    (void)ss;
+    (void)oss;
+    return ENOSYS;
+}
+
+int sys_sigtimedwait(const sigset_t *__restrict set, siginfo_t *__restrict info,
+        const struct timespec *__restrict timeout, int *out_signal) {
+    (void)set;
+    (void)info;
+    (void)timeout;
+    if (out_signal) {
+        *out_signal = 0;
+    }
+    return ENOSYS;
+}
+
+int sys_splice(int in_fd, off_t *in_off, int out_fd, off_t *out_off, size_t size, unsigned int flags, ssize_t *out) {
+    (void)in_fd;
+    (void)in_off;
+    (void)out_fd;
+    (void)out_off;
+    (void)size;
+    (void)flags;
+    if (out) {
+        *out = -1;
+    }
+    return ENOSYS;
+}
+
+void sys_sync() {
+}
+
+int sys_sysconf(int num, long *ret) {
+    if (!ret) {
+        return EINVAL;
+    }
+    switch (num) {
+        case _SC_PAGESIZE:
+            *ret = 4096;
+            return 0;
+#if defined(_SC_PAGE_SIZE) && (!defined(_SC_PAGESIZE) || (_SC_PAGE_SIZE != _SC_PAGESIZE))
+        case _SC_PAGE_SIZE:
+            *ret = 4096;
+            return 0;
+#endif
+        case _SC_OPEN_MAX:
+            *ret = 1024;
+            return 0;
+        case _SC_CLK_TCK:
+            *ret = 100;
+            return 0;
+        case _SC_NPROCESSORS_CONF:
+        case _SC_NPROCESSORS_ONLN:
+            *ret = 1;
+            return 0;
+        default:
+            return ENOSYS;
+    }
+}
+
+int sys_thread_setname(void *tcb, const char *name) {
+    (void)tcb;
+    (void)name;
+    return 0;
+}
+
+int sys_thread_getname(void *tcb, char *name, size_t size) {
+    (void)tcb;
+    if (!name || size == 0) {
+        return EINVAL;
+    }
+    name[0] = '\0';
+    return 0;
+}
+
+int sys_timer_create(clockid_t clk, struct sigevent *__restrict evp, timer_t *__restrict res) {
+    (void)clk;
+    (void)evp;
+    if (res) {
+        *res = 0;
+    }
+    return ENOSYS;
+}
+
+int sys_timer_settime(timer_t t, int flags, const struct itimerspec *__restrict val,
+        struct itimerspec *__restrict old) {
+    (void)t;
+    (void)flags;
+    (void)val;
+    if (old) {
+        memset(old, 0, sizeof(*old));
+    }
+    return ENOSYS;
+}
+
+int sys_timer_gettime(timer_t t, struct itimerspec *val) {
+    (void)t;
+    if (!val) {
+        return EINVAL;
+    }
+    memset(val, 0, sizeof(*val));
+    return ENOSYS;
+}
+
+int sys_timer_delete(timer_t t) {
+    (void)t;
+    return ENOSYS;
+}
+
+int sys_times(struct tms *tms, clock_t *out) {
+    if (!out) {
+        return EINVAL;
+    }
+    if (tms) {
+        memset(tms, 0, sizeof(*tms));
+    }
+    time_t secs = 0;
+    long nanos = 0;
+    int e = sys_clock_get(CLOCK_MONOTONIC, &secs, &nanos);
+    if (e) {
+        return e;
+    }
+    *out = static_cast<clock_t>(secs * 100 + nanos / 10000000L);
+    return 0;
+}
+
+int sys_vm_remap(void *pointer, size_t size, size_t new_size, void **window) {
+    (void)pointer;
+    (void)size;
+    (void)new_size;
+    if (!window) {
+        return EINVAL;
+    }
+    *window = nullptr;
+    return ENOSYS;
+}
+
+int sys_waitid(idtype_t idtype, id_t id, siginfo_t *info, int options) {
+    pid_t pid = -1;
+    if (idtype == P_PID) {
+        pid = static_cast<pid_t>(id);
+    } else if (idtype == P_PGID) {
+        pid = static_cast<pid_t>(-id);
+    } else if (idtype != P_ALL) {
+        return EINVAL;
+    }
+
+    int status = 0;
+    struct rusage ru {};
+    pid_t ret_pid = 0;
+    int e = sys_waitpid(pid, &status, (options & WNOHANG) ? WNOHANG : 0, &ru, &ret_pid);
+    if (e) {
+        return e;
+    }
+
+    if (info) {
+        memset(info, 0, sizeof(*info));
+        info->si_signo = SIGCHLD;
+        info->si_pid = ret_pid;
+        if (ret_pid == 0) {
+            info->si_code = 0;
+        } else if ((status & 0x7F) == 0) {
+            info->si_code = CLD_EXITED;
+            info->si_status = (status >> 8) & 0xFF;
+        } else {
+            info->si_code = CLD_KILLED;
+            info->si_status = status & 0x7F;
+        }
+    }
+    return 0;
+}
+
+int sys_chroot(const char *path) {
+    (void)path;
+    return ENOSYS;
+}
+
+void sys_yield() {
+    __syscall0(SYS_yield);
 }
 
 }  // namespace mlibc
