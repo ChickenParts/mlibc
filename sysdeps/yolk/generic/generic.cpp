@@ -96,6 +96,9 @@ static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *ou
 }
 
 static int iov_total_length(const struct iovec *iov, size_t iovlen, size_t *total_out) {
+	if (!iov && iovlen > 0) {
+		return EINVAL;
+	}
 	if (!total_out) {
 		return EINVAL;
 	}
@@ -107,6 +110,18 @@ static int iov_total_length(const struct iovec *iov, size_t iovlen, size_t *tota
 		total += iov[i].iov_len;
 	}
 	*total_out = total;
+	return 0;
+}
+
+static int iov_validate_bases(const struct iovec *iov, size_t iovlen) {
+	if (!iov && iovlen > 0) {
+		return EINVAL;
+	}
+	for (size_t i = 0; i < iovlen; i++) {
+		if (iov[i].iov_len > 0 && !iov[i].iov_base) {
+			return EFAULT;
+		}
+	}
 	return 0;
 }
 
@@ -1643,10 +1658,12 @@ int sys_connect(int fd, const struct sockaddr *addr, socklen_t addrlen) {
 }
 
 int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
-    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
-        long result = __syscall6(SYS_sendto_core, fd, 0, 0, flags,
-                                 (long)(hdr ? hdr->msg_name : nullptr),
-                                 (long)(hdr ? hdr->msg_namelen : 0));
+    if (!length) {
+        return EINVAL;
+    }
+
+    if (!hdr) {
+        long result = __syscall6(SYS_sendto_core, fd, 0, 0, flags, 0, 0);
         if (sc_failed(result)) {
             return sc_errno(result);
         }
@@ -1654,9 +1671,41 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
         return 0;
     }
 
-    if (hdr->msg_iovlen > 1 && (!hdr->msg_control || !hdr->msg_controllen)) {
+    struct msghdr normalized = *hdr;
+    if (normalized.msg_controllen == 0) {
+        normalized.msg_control = nullptr;
+    }
+
+    long result = __syscall3(SYS_sendmsg_core, fd, (long)&normalized, flags);
+    if (!sc_enosys(result)) {
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+        *length = result;
+        return 0;
+    }
+
+    if (normalized.msg_controllen != 0) {
+        return EOPNOTSUPP;
+    }
+
+    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
+        result = __syscall6(SYS_sendto_core, fd, 0, 0, flags,
+                            (long)normalized.msg_name, (long)normalized.msg_namelen);
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+        *length = result;
+        return 0;
+    }
+
+    if (hdr->msg_iovlen > 1) {
+        int e = iov_validate_bases(hdr->msg_iov, hdr->msg_iovlen);
+        if (e) {
+            return e;
+        }
         size_t total = 0;
-        int e = iov_total_length(hdr->msg_iov, hdr->msg_iovlen, &total);
+        e = iov_total_length(hdr->msg_iov, hdr->msg_iovlen, &total);
         if (e) {
             return e;
         }
@@ -1670,8 +1719,8 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
             iov_gather_bytes(tmp, hdr->msg_iov, hdr->msg_iovlen);
         }
 
-        long result = __syscall6(SYS_sendto_core, fd, (long)tmp, total, flags,
-                                 (long)hdr->msg_name, hdr->msg_namelen);
+        result = __syscall6(SYS_sendto_core, fd, (long)tmp, total, flags,
+                            (long)normalized.msg_name, normalized.msg_namelen);
         if (tmp) {
             free(tmp);
         }
@@ -1682,45 +1731,76 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
         return 0;
     }
 
-	long result = __syscall3(SYS_sendmsg_core, fd, (long)hdr, flags);
-	if (sc_enosys(result)) {
-		if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
-			return EINVAL;
-		}
-		if (hdr->msg_control && hdr->msg_controllen) {
-			return EOPNOTSUPP;
-		}
-
-        const struct iovec *iov = hdr->msg_iov;
-        result = __syscall6(SYS_sendto_core, fd, (long)iov[0].iov_base, iov[0].iov_len,
-                            flags, (long)hdr->msg_name, hdr->msg_namelen);
+    if (!hdr->msg_iov || hdr->msg_iovlen != 1) {
+        return EINVAL;
     }
-    if (result < 0) {
-        return -result;
+    if (hdr->msg_iov[0].iov_len > 0 && !hdr->msg_iov[0].iov_base) {
+        return EFAULT;
+    }
+
+    const struct iovec *iov = hdr->msg_iov;
+    result = __syscall6(SYS_sendto_core, fd, (long)iov[0].iov_base, iov[0].iov_len,
+                        flags, (long)normalized.msg_name, normalized.msg_namelen);
+    if (sc_failed(result)) {
+        return sc_errno(result);
     }
     *length = result;
     return 0;
 }
 
 int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
-    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
-        socklen_t addrlen = hdr ? hdr->msg_namelen : 0;
-        long result = __syscall6(SYS_recvfrom_core, fd, 0, 0, flags,
-                                 (long)(hdr ? hdr->msg_name : nullptr),
-                                 (long)&addrlen);
+    if (!length) {
+        return EINVAL;
+    }
+
+    if (!hdr) {
+        socklen_t addrlen = 0;
+        long result = __syscall6(SYS_recvfrom_core, fd, 0, 0, flags, 0, (long)&addrlen);
         if (sc_failed(result)) {
             return sc_errno(result);
-        }
-        if (hdr) {
-            hdr->msg_namelen = addrlen;
         }
         *length = result;
         return 0;
     }
 
-    if (hdr->msg_iovlen > 1 && (!hdr->msg_control || !hdr->msg_controllen)) {
+    struct msghdr normalized = *hdr;
+    if (normalized.msg_controllen == 0) {
+        normalized.msg_control = nullptr;
+    }
+
+    long result = __syscall3(SYS_recvmsg_core, fd, (long)&normalized, flags);
+    if (!sc_enosys(result)) {
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+        *length = result;
+        return 0;
+    }
+
+    if (normalized.msg_controllen != 0) {
+        return EOPNOTSUPP;
+    }
+
+    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
+        socklen_t addrlen = normalized.msg_namelen;
+        result = __syscall6(SYS_recvfrom_core, fd, 0, 0, flags,
+                            (long)normalized.msg_name, (long)&addrlen);
+        if (sc_failed(result)) {
+            return sc_errno(result);
+        }
+        hdr->msg_namelen = addrlen;
+        hdr->msg_flags = 0;
+        *length = result;
+        return 0;
+    }
+
+    if (hdr->msg_iovlen > 1) {
+        int e = iov_validate_bases(hdr->msg_iov, hdr->msg_iovlen);
+        if (e) {
+            return e;
+        }
         size_t total = 0;
-        int e = iov_total_length(hdr->msg_iov, hdr->msg_iovlen, &total);
+        e = iov_total_length(hdr->msg_iov, hdr->msg_iovlen, &total);
         if (e) {
             return e;
         }
@@ -1734,8 +1814,8 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         }
 
         socklen_t addrlen = hdr->msg_namelen;
-        long result = __syscall6(SYS_recvfrom_core, fd, (long)tmp, total, flags,
-                                 (long)hdr->msg_name, (long)&addrlen);
+        result = __syscall6(SYS_recvfrom_core, fd, (long)tmp, total, flags,
+                            (long)normalized.msg_name, (long)&addrlen);
         if (sc_failed(result)) {
             if (tmp) {
                 free(tmp);
@@ -1748,30 +1828,27 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
             free(tmp);
         }
         hdr->msg_namelen = addrlen;
+        hdr->msg_flags = 0;
         *length = result;
         return 0;
     }
 
-	long result = __syscall3(SYS_recvmsg_core, fd, (long)hdr, flags);
-	if (sc_enosys(result)) {
-		if (!hdr || !hdr->msg_iov || hdr->msg_iovlen != 1) {
-			return EINVAL;
-		}
-		if (hdr->msg_control && hdr->msg_controllen) {
-			return EOPNOTSUPP;
-		}
+    if (!hdr->msg_iov || hdr->msg_iovlen != 1) {
+        return EINVAL;
+    }
+    if (hdr->msg_iov[0].iov_len > 0 && !hdr->msg_iov[0].iov_base) {
+        return EFAULT;
+    }
 
-        struct iovec *iov = hdr->msg_iov;
-        socklen_t addrlen = hdr->msg_namelen;
-        result = __syscall6(SYS_recvfrom_core, fd, (long)iov[0].iov_base, iov[0].iov_len,
-                            flags, (long)hdr->msg_name, (long)&addrlen);
-        if (!sc_failed(result)) {
-            hdr->msg_namelen = addrlen;
-        }
+    struct iovec *iov = hdr->msg_iov;
+    socklen_t addrlen = hdr->msg_namelen;
+    result = __syscall6(SYS_recvfrom_core, fd, (long)iov[0].iov_base, iov[0].iov_len,
+                        flags, (long)normalized.msg_name, (long)&addrlen);
+    if (sc_failed(result)) {
+        return sc_errno(result);
     }
-    if (result < 0) {
-        return -result;
-    }
+    hdr->msg_namelen = addrlen;
+    hdr->msg_flags = 0;
     *length = result;
     return 0;
 }
