@@ -1522,9 +1522,24 @@ int sys_setrlimit(int resource, const struct rlimit *rlim) {
 }
 
 int sys_getrusage(int who, struct rusage *usage) {
-    /* TODO: Implement rusage in Yolk */
-    (void)who;
+    if (!usage) {
+        return EINVAL;
+    }
+    if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN) {
+        return EINVAL;
+    }
+
     memset(usage, 0, sizeof(*usage));
+
+    /* Best-effort userspace fallback: expose coarse wall-time for SELF. */
+    if (who == RUSAGE_SELF) {
+        struct timeval tv {};
+        int e = sys_gettimeofday(&tv);
+        if (!e) {
+            usage->ru_utime = tv;
+        }
+    }
+
     return 0;
 }
 
