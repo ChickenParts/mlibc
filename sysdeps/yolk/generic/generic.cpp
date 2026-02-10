@@ -1681,6 +1681,15 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
     }
 
     struct msghdr normalized = *hdr;
+    if (normalized.msg_namelen && !normalized.msg_name) {
+        return EINVAL;
+    }
+    if (normalized.msg_controllen && !normalized.msg_control) {
+        return EFAULT;
+    }
+    if (normalized.msg_iovlen && !normalized.msg_iov) {
+        return EINVAL;
+    }
     if (normalized.msg_controllen == 0) {
         normalized.msg_control = nullptr;
     }
@@ -1698,7 +1707,7 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
         return EOPNOTSUPP;
     }
 
-    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
+    if (!hdr->msg_iov || hdr->msg_iovlen == 0) {
         result = __syscall6(SYS_sendto_core, fd, 0, 0, flags,
                             (long)normalized.msg_name, (long)normalized.msg_namelen);
         if (sc_failed(result)) {
@@ -1773,6 +1782,15 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
     }
 
     struct msghdr normalized = *hdr;
+    if (normalized.msg_namelen && !normalized.msg_name) {
+        return EINVAL;
+    }
+    if (normalized.msg_controllen && !normalized.msg_control) {
+        return EFAULT;
+    }
+    if (normalized.msg_iovlen && !normalized.msg_iov) {
+        return EINVAL;
+    }
     if (normalized.msg_controllen == 0) {
         normalized.msg_control = nullptr;
     }
@@ -1782,6 +1800,9 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         if (sc_failed(result)) {
             return sc_errno(result);
         }
+        hdr->msg_namelen = normalized.msg_namelen;
+        hdr->msg_controllen = normalized.msg_controllen;
+        hdr->msg_flags = normalized.msg_flags;
         *length = result;
         return 0;
     }
@@ -1790,7 +1811,7 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         return EOPNOTSUPP;
     }
 
-    if (!hdr || !hdr->msg_iov || hdr->msg_iovlen == 0) {
+    if (!hdr->msg_iov || hdr->msg_iovlen == 0) {
         socklen_t addrlen = normalized.msg_namelen;
         result = __syscall6(SYS_recvfrom_core, fd, 0, 0, flags,
                             (long)normalized.msg_name, (long)&addrlen);
