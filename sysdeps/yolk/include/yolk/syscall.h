@@ -116,6 +116,7 @@
 #define SYS_shmctl_core        177
 #define SYS_semget_core        178
 #define SYS_semctl_core        179
+#define SYS_semop_core         180
 /* Core-Yolk alias for legacy service registration */
 #define SYS_service_register_core 96
 /* Core-Yolk aliases for legacy console control */
@@ -243,6 +244,7 @@
 #define SYS_shmctl              SYS_shmctl_core
 #define SYS_semget              SYS_semget_core
 #define SYS_semctl              SYS_semctl_core
+#define SYS_semop               SYS_semop_core
 
 /* Service registration */
 #define SYS_service_register SYS_service_register_core

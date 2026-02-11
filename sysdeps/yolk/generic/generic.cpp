@@ -33,6 +33,7 @@
 #include <sys/times.h>
 #include <sys/wait.h>
 #include <sys/ipc.h>
+#include <sys/sem.h>
 #include <sys/shm.h>
 #include <unistd.h>
 #include <abi-bits/statfs.h>
@@ -2972,6 +2973,17 @@ int sys_semget(key_t key, int n, int fl, int *id) {
         return -rv;
     }
     *id = (int)rv;
+    return 0;
+}
+
+int sys_semop(int semid, struct sembuf *sops, size_t nsops) {
+    if (!sops || nsops == 0) {
+        return EINVAL;
+    }
+    long rv = __syscall3(SYS_semop_core, semid, (long)sops, nsops);
+    if (rv < 0) {
+        return -rv;
+    }
     return 0;
 }
 
