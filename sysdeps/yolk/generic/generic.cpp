@@ -97,6 +97,11 @@ static mode_t g_process_umask = 0022;
 static int g_process_nice = 0;
 static unsigned long g_memfd_seq = 0;
 static unsigned long g_process_personality = 0;
+static thread_local stack_t g_sigaltstack_state = {
+	.ss_sp = nullptr,
+	.ss_flags = SS_DISABLE,
+	.ss_size = 0
+};
 
 static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *out) {
 	if (!in || !out) {
@@ -2893,9 +2898,32 @@ int sys_shmget(int *shm_id, key_t key, size_t size, int shmflg) {
 }
 
 int sys_sigaltstack(const stack_t *ss, stack_t *oss) {
-    (void)ss;
-    (void)oss;
-    return ENOSYS;
+    if (oss) {
+        *oss = g_sigaltstack_state;
+    }
+
+    if (!ss) {
+        return 0;
+    }
+
+    if (ss->ss_flags & ~(SS_DISABLE)) {
+        return EINVAL;
+    }
+
+    if (ss->ss_flags & SS_DISABLE) {
+        g_sigaltstack_state.ss_sp = nullptr;
+        g_sigaltstack_state.ss_size = 0;
+        g_sigaltstack_state.ss_flags = SS_DISABLE;
+        return 0;
+    }
+
+    if (!ss->ss_sp || ss->ss_size < MINSIGSTKSZ) {
+        return ENOMEM;
+    }
+
+    g_sigaltstack_state = *ss;
+    g_sigaltstack_state.ss_flags &= ~SS_DISABLE;
+    return 0;
 }
 
 int sys_sigtimedwait(const sigset_t *__restrict set, siginfo_t *__restrict info,
