@@ -2783,18 +2783,19 @@ int sys_mincore(void *addr, size_t length, unsigned char *vec) {
 }
 
 int sys_mkfifoat(int dirfd, const char *path, mode_t mode) {
-    (void)dirfd;
-    (void)path;
-    (void)mode;
-    return ENOSYS;
+    long ret = __syscall3(SYS_mkfifoat_core, dirfd, (long)path, mode);
+    if (ret < 0) {
+        return -ret;
+    }
+    return 0;
 }
 
 int sys_mknodat(int dirfd, const char *path, int mode, int dev) {
-    (void)dirfd;
-    (void)path;
-    (void)mode;
-    (void)dev;
-    return ENOSYS;
+    long ret = __syscall4(SYS_mknodat_core, dirfd, (long)path, mode, dev);
+    if (ret < 0) {
+        return -ret;
+    }
+    return 0;
 }
 
 int sys_mlock(const void *addr, size_t length) {

@@ -101,6 +101,8 @@
 #define SYS_timer_settime_core 153
 #define SYS_timer_gettime_core 154
 #define SYS_timer_delete_core  155
+#define SYS_mknodat_core       156
+#define SYS_mkfifoat_core      157
 /* Native async waitset core syscalls */
 #define SYS_waitset_create     160
 #define SYS_waitset_ctl        161
@@ -151,6 +153,8 @@
 #define SYS_fchmodat        SYS_fchmodat_core
 #define SYS_faccessat       SYS_faccessat_core
 #define SYS_utimensat       SYS_utimensat_core
+#define SYS_mknodat         SYS_mknodat_core
+#define SYS_mkfifoat        SYS_mkfifoat_core
 #define SYS_pselect         SYS_pselect_core
 #define SYS_ppoll           SYS_ppoll_core
 #define SYS_open            SYS_open_core
