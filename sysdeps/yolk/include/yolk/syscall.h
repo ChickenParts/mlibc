@@ -63,6 +63,7 @@
 #define SYS_clone_core         59
 #define SYS_vfork_core         60
 #define SYS_tkill_core         61
+#define SYS_sigtimedwait_core  62
 /* Core-Yolk aliases for minimal *at compatibility subset */
 #define SYS_fstatat_core       64
 #define SYS_mkdirat_core       65
@@ -95,11 +96,18 @@
 /* Core-Yolk aliases for poll-with-mask */
 #define SYS_pselect_core       134
 #define SYS_ppoll_core         135
+/* Core-Yolk aliases for POSIX timer syscalls */
+#define SYS_timer_create_core  152
+#define SYS_timer_settime_core 153
+#define SYS_timer_gettime_core 154
+#define SYS_timer_delete_core  155
 /* Native async waitset core syscalls */
 #define SYS_waitset_create     160
 #define SYS_waitset_ctl        161
 #define SYS_waitset_wait       162
 #define SYS_fstatfs_core       163
+#define SYS_brk_core           164
+#define SYS_clock_settime_core 167
 /* Core-Yolk alias for legacy service registration */
 #define SYS_service_register_core 96
 /* Core-Yolk aliases for legacy console control */
@@ -158,6 +166,7 @@
 #define SYS_clock_getres    SYS_clock_getres_core
 #define SYS_nanosleep       SYS_nanosleep_core
 #define SYS_gettimeofday    SYS_gettimeofday_core
+#define SYS_clock_settime   SYS_clock_settime_core
 
 /* System info syscalls */
 #define SYS_uname           63
@@ -181,6 +190,7 @@
 #define SYS_exit_group      SYS_exit_group_core
 #define SYS_waitpid         SYS_waitpid_core
 #define SYS_wait4           SYS_wait4_core
+#define SYS_brk             SYS_brk_core
 
 /* Signal syscalls */
 #define SYS_kill            SYS_kill_core
@@ -191,6 +201,13 @@
 #define SYS_sigpending      SYS_sigpending_core
 #define SYS_tkill           SYS_tkill_core
 #define SYS_tgkill          SYS_tgkill_core
+#define SYS_sigtimedwait    SYS_sigtimedwait_core
+
+/* POSIX timer syscalls */
+#define SYS_timer_create    SYS_timer_create_core
+#define SYS_timer_settime   SYS_timer_settime_core
+#define SYS_timer_gettime   SYS_timer_gettime_core
+#define SYS_timer_delete    SYS_timer_delete_core
 
 /* IPC syscalls */
 #define SYS_endpoint_create     100

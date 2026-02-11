@@ -111,17 +111,6 @@ struct itimer_state {
 
 static itimer_state g_itimer_state[3] = {};
 
-struct posix_timer_state {
-	bool used;
-	bool armed;
-	clockid_t clock;
-	struct itimerspec programmed;
-	struct timespec armed_at;
-};
-
-static constexpr size_t k_max_posix_timers = 64;
-static posix_timer_state g_posix_timers[k_max_posix_timers] = {};
-
 static inline long long timeval_to_us(const struct timeval &tv) {
 	return static_cast<long long>(tv.tv_sec) * 1000000LL + static_cast<long long>(tv.tv_usec);
 }
@@ -136,41 +125,12 @@ static inline struct timeval us_to_timeval(long long us) {
 	return tv;
 }
 
-static inline long long timespec_to_ns(const struct timespec &ts) {
-	return static_cast<long long>(ts.tv_sec) * 1000000000LL + static_cast<long long>(ts.tv_nsec);
-}
-
-static inline struct timespec ns_to_timespec(long long ns) {
-	struct timespec ts {};
-	if (ns < 0) {
-		ns = 0;
-	}
-	ts.tv_sec = static_cast<time_t>(ns / 1000000000LL);
-	ts.tv_nsec = static_cast<long>(ns % 1000000000LL);
-	return ts;
-}
-
 static int get_now_timeval(struct timeval *tv) {
 	if (!tv) {
 		return EINVAL;
 	}
 	long result = __syscall2(SYS_gettimeofday_core, (long)tv, 0);
 	return result < 0 ? -result : 0;
-}
-
-static int get_now_timespec(clockid_t clk, struct timespec *ts) {
-	if (!ts) {
-		return EINVAL;
-	}
-	time_t secs = 0;
-	long nanos = 0;
-	int e = sys_clock_get(clk, &secs, &nanos);
-	if (e) {
-		return e;
-	}
-	ts->tv_sec = secs;
-	ts->tv_nsec = nanos;
-	return 0;
 }
 
 static bool valid_timeval(const struct timeval &tv) {
@@ -221,54 +181,6 @@ static void compute_itimer_current(int which, const struct timeval &now, struct 
 	out->it_value = us_to_timeval(rem);
 }
 
-static int timer_slot_from_id(timer_t t, size_t *slot_out) {
-	if (!slot_out) {
-		return EINVAL;
-	}
-	uintptr_t raw = reinterpret_cast<uintptr_t>(t);
-	if (raw == 0) {
-		return EINVAL;
-	}
-	size_t slot = raw - 1;
-	if (slot >= k_max_posix_timers || !g_posix_timers[slot].used) {
-		return EINVAL;
-	}
-	*slot_out = slot;
-	return 0;
-}
-
-static void compute_posix_timer_current(posix_timer_state &st, const struct timespec &now,
-		struct itimerspec *out) {
-	memset(out, 0, sizeof(*out));
-	out->it_interval = st.programmed.it_interval;
-	if (!st.armed) {
-		return;
-	}
-
-	long long initial_ns = timespec_to_ns(st.programmed.it_value);
-	long long interval_ns = timespec_to_ns(st.programmed.it_interval);
-	long long elapsed_ns = timespec_to_ns(now) - timespec_to_ns(st.armed_at);
-	if (elapsed_ns < 0) {
-		elapsed_ns = 0;
-	}
-
-	if (elapsed_ns < initial_ns) {
-		out->it_value = ns_to_timespec(initial_ns - elapsed_ns);
-		return;
-	}
-
-	if (interval_ns <= 0) {
-		st.armed = false;
-		return;
-	}
-
-	long long after_first = elapsed_ns - initial_ns;
-	long long rem = interval_ns - (after_first % interval_ns);
-	if (rem == interval_ns) {
-		rem = 0;
-	}
-	out->it_value = ns_to_timespec(rem);
-}
 
 static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *out) {
 	if (!in || !out) {
@@ -2521,18 +2433,24 @@ int sys_before_cancellable_syscall(ucontext_t *uctx) {
 }
 
 int sys_brk(void **out) {
-    if (!out) {
-        return EINVAL;
-    }
-    *out = nullptr;
-    return ENOSYS;
+	if (!out) {
+		return EINVAL;
+	}
+	long result = __syscall1(SYS_brk_core, 0);
+	if (result < 0) {
+		*out = nullptr;
+		return -result;
+	}
+	*out = reinterpret_cast<void *>(result);
+	return 0;
 }
 
 int sys_clock_set(int clock, time_t secs, long nanos) {
-    (void)clock;
-    (void)secs;
-    (void)nanos;
-    return ENOSYS;
+	struct timespec ts {};
+	ts.tv_sec = secs;
+	ts.tv_nsec = nanos;
+	long result = __syscall2(SYS_clock_settime_core, clock, (long)&ts);
+	return result < 0 ? -result : 0;
 }
 
 int sys_fadvise(int fd, off_t offset, off_t length, int advice) {
@@ -3124,14 +3042,26 @@ int sys_sigaltstack(const stack_t *ss, stack_t *oss) {
 }
 
 int sys_sigtimedwait(const sigset_t *__restrict set, siginfo_t *__restrict info,
-        const struct timespec *__restrict timeout, int *out_signal) {
-    (void)set;
-    (void)info;
-    (void)timeout;
-    if (out_signal) {
-        *out_signal = 0;
-    }
-    return ENOSYS;
+		const struct timespec *__restrict timeout, int *out_signal) {
+	if (!set) {
+		if (out_signal) {
+			*out_signal = 0;
+		}
+		return EINVAL;
+	}
+
+	long result = __syscall3(SYS_sigtimedwait_core, (long)set, (long)info, (long)timeout);
+	if (result < 0) {
+		if (out_signal) {
+			*out_signal = 0;
+		}
+		return -result;
+	}
+
+	if (out_signal) {
+		*out_signal = static_cast<int>(result);
+	}
+	return 0;
 }
 
 int sys_splice(int in_fd, off_t *in_off, int out_fd, off_t *out_off, size_t size, unsigned int flags, ssize_t *out) {
@@ -3307,100 +3237,40 @@ int sys_thread_getname(void *tcb, char *name, size_t size) {
 }
 
 int sys_timer_create(clockid_t clk, struct sigevent *__restrict evp, timer_t *__restrict res) {
-    if (!res) {
-        return EINVAL;
-    }
+	if (!res) {
+		return EINVAL;
+	}
+	if (evp && evp->sigev_notify != SIGEV_NONE) {
+		return EOPNOTSUPP;
+	}
 
-    if (evp && evp->sigev_notify != SIGEV_NONE) {
-        return EOPNOTSUPP;
-    }
-
-    for (size_t i = 0; i < k_max_posix_timers; i++) {
-        if (g_posix_timers[i].used) {
-            continue;
-        }
-        g_posix_timers[i] = {};
-        g_posix_timers[i].used = true;
-        g_posix_timers[i].clock = clk;
-        *res = reinterpret_cast<timer_t>(i + 1);
-        return 0;
-    }
-
-    return EAGAIN;
+	long result = __syscall2(SYS_timer_create_core, clk, (long)res);
+	return result < 0 ? -result : 0;
 }
 
 int sys_timer_settime(timer_t t, int flags, const struct itimerspec *__restrict val,
-        struct itimerspec *__restrict old) {
-    if (!val) {
-        return EINVAL;
-    }
-    if (!valid_timespec(val->it_value) || !valid_timespec(val->it_interval)) {
-        return EINVAL;
-    }
-
-    size_t slot = 0;
-    int e = timer_slot_from_id(t, &slot);
-    if (e) {
-        return e;
-    }
-    posix_timer_state &st = g_posix_timers[slot];
-
-    struct timespec now {};
-    e = get_now_timespec(st.clock, &now);
-    if (e) {
-        return e;
-    }
-
-    if (old) {
-        compute_posix_timer_current(st, now, old);
-    }
-
-    struct itimerspec programmed = *val;
-    if (flags & TIMER_ABSTIME) {
-        long long abs_ns = timespec_to_ns(val->it_value);
-        long long now_ns = timespec_to_ns(now);
-        programmed.it_value = ns_to_timespec(abs_ns > now_ns ? abs_ns - now_ns : 0);
-    } else if (flags != 0) {
-        return EINVAL;
-    }
-
-    st.programmed = programmed;
-    st.armed_at = now;
-    st.armed = (programmed.it_value.tv_sec != 0 || programmed.it_value.tv_nsec != 0);
-    return 0;
+		struct itimerspec *__restrict old) {
+	if (!val) {
+		return EINVAL;
+	}
+	if (!valid_timespec(val->it_value) || !valid_timespec(val->it_interval)) {
+		return EINVAL;
+	}
+	long result = __syscall4(SYS_timer_settime_core, (long)t, flags, (long)val, (long)old);
+	return result < 0 ? -result : 0;
 }
 
 int sys_timer_gettime(timer_t t, struct itimerspec *val) {
-    if (!val) {
-        return EINVAL;
-    }
-
-    size_t slot = 0;
-    int e = timer_slot_from_id(t, &slot);
-    if (e) {
-        return e;
-    }
-    posix_timer_state &st = g_posix_timers[slot];
-
-    struct timespec now {};
-    e = get_now_timespec(st.clock, &now);
-    if (e) {
-        return e;
-    }
-
-    compute_posix_timer_current(st, now, val);
-    return 0;
+	if (!val) {
+		return EINVAL;
+	}
+	long result = __syscall2(SYS_timer_gettime_core, (long)t, (long)val);
+	return result < 0 ? -result : 0;
 }
 
 int sys_timer_delete(timer_t t) {
-    size_t slot = 0;
-    int e = timer_slot_from_id(t, &slot);
-    if (e) {
-        return e;
-    }
-
-    g_posix_timers[slot] = {};
-    return 0;
+	long result = __syscall1(SYS_timer_delete_core, (long)t);
+	return result < 0 ? -result : 0;
 }
 
 int sys_times(struct tms *tms, clock_t *out) {
