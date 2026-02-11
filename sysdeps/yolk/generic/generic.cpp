@@ -2832,7 +2832,7 @@ int sys_name_to_handle_at(int dirfd, const char *pathname, struct file_handle *h
     (void)handle;
     (void)mount_id;
     (void)flags;
-    return ENOSYS;
+    return EOPNOTSUPP;
 }
 
 int sys_openpt(int oflags, int *fd) {
@@ -2936,7 +2936,7 @@ int sys_riscv_flush_icache(void *start, void *end, unsigned long flags) {
     (void)start;
     (void)end;
     (void)flags;
-    return ENOSYS;
+    return 0;
 }
 
 int sys_riscv_hwprobe(struct riscv_hwprobe *pairs, size_t pair_count, size_t cpusetsize, cpu_set_t *cpus, unsigned int flags) {
@@ -2945,29 +2945,34 @@ int sys_riscv_hwprobe(struct riscv_hwprobe *pairs, size_t pair_count, size_t cpu
     (void)cpusetsize;
     (void)cpus;
     (void)flags;
-    return ENOSYS;
+    return EOPNOTSUPP;
 }
 
 int sys_semctl(int semid, int semnum, int cmd, void *semun, int *ret) {
-    (void)semid;
-    (void)semnum;
-    (void)cmd;
-    (void)semun;
-    if (ret) {
-        *ret = -1;
+    long rv = __syscall4(SYS_semctl_core, semid, semnum, cmd, (long)semun);
+    if (rv < 0) {
+        if (ret) {
+            *ret = -1;
+        }
+        return -rv;
     }
-    return ENOSYS;
+    if (ret) {
+        *ret = (int)rv;
+    }
+    return 0;
 }
 
 int sys_semget(key_t key, int n, int fl, int *id) {
-    (void)key;
-    (void)n;
-    (void)fl;
     if (!id) {
         return EINVAL;
     }
-    *id = -1;
-    return ENOSYS;
+    long rv = __syscall3(SYS_semget_core, key, n, fl);
+    if (rv < 0) {
+        *id = -1;
+        return -rv;
+    }
+    *id = (int)rv;
+    return 0;
 }
 
 int sys_sethostname(const char *buffer, size_t bufsize) {
@@ -2977,40 +2982,51 @@ int sys_sethostname(const char *buffer, size_t bufsize) {
 }
 
 int sys_shmat(void **seg_start, int shmid, const void *shmaddr, int shmflg) {
-    (void)shmid;
-    (void)shmaddr;
-    (void)shmflg;
     if (!seg_start) {
         return EINVAL;
     }
-    *seg_start = nullptr;
-    return ENOSYS;
+    long rv = __syscall3(SYS_shmat_core, shmid, (long)shmaddr, shmflg);
+    if (rv < 0) {
+        *seg_start = nullptr;
+        return -rv;
+    }
+    *seg_start = (void *)rv;
+    return 0;
 }
 
 int sys_shmctl(int *idx, int shmid, int cmd, struct shmid_ds *buf) {
-    (void)shmid;
-    (void)cmd;
-    (void)buf;
-    if (idx) {
-        *idx = -1;
+    long rv = __syscall3(SYS_shmctl_core, shmid, cmd, (long)buf);
+    if (rv < 0) {
+        if (idx) {
+            *idx = -1;
+        }
+        return -rv;
     }
-    return ENOSYS;
+    if (idx) {
+        *idx = (int)rv;
+    }
+    return 0;
 }
 
 int sys_shmdt(const void *shmaddr) {
-    (void)shmaddr;
-    return ENOSYS;
+    long rv = __syscall1(SYS_shmdt_core, (long)shmaddr);
+    if (rv < 0) {
+        return -rv;
+    }
+    return 0;
 }
 
 int sys_shmget(int *shm_id, key_t key, size_t size, int shmflg) {
-    (void)key;
-    (void)size;
-    (void)shmflg;
     if (!shm_id) {
         return EINVAL;
     }
-    *shm_id = -1;
-    return ENOSYS;
+    long rv = __syscall3(SYS_shmget_core, key, size, shmflg);
+    if (rv < 0) {
+        *shm_id = -1;
+        return -rv;
+    }
+    *shm_id = (int)rv;
+    return 0;
 }
 
 int sys_sigaltstack(const stack_t *ss, stack_t *oss) {

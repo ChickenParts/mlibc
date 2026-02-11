@@ -110,6 +110,12 @@
 #define SYS_fstatfs_core       163
 #define SYS_brk_core           164
 #define SYS_clock_settime_core 167
+#define SYS_shmget_core        174
+#define SYS_shmat_core         175
+#define SYS_shmdt_core         176
+#define SYS_shmctl_core        177
+#define SYS_semget_core        178
+#define SYS_semctl_core        179
 /* Core-Yolk alias for legacy service registration */
 #define SYS_service_register_core 96
 /* Core-Yolk aliases for legacy console control */
@@ -231,6 +237,12 @@
 #define SYS_shmem_protect       112
 #define SYS_shmem_stat          113
 #define SYS_shmem_resize        114
+#define SYS_shmget              SYS_shmget_core
+#define SYS_shmat               SYS_shmat_core
+#define SYS_shmdt               SYS_shmdt_core
+#define SYS_shmctl              SYS_shmctl_core
+#define SYS_semget              SYS_semget_core
+#define SYS_semctl              SYS_semctl_core
 
 /* Service registration */
 #define SYS_service_register SYS_service_register_core
