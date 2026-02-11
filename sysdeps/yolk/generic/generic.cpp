@@ -49,6 +49,14 @@
 #define TIOCGPTN  0x80045430
 #define TIOCSWINSZ 0x5414
 
+#ifndef MFD_CLOEXEC
+#define MFD_CLOEXEC 0x0001U
+#endif
+
+#ifndef MFD_ALLOW_SEALING
+#define MFD_ALLOW_SEALING 0x0002U
+#endif
+
 /* epoll definitions for sysdeps (avoid header dependencies during bootstrap) */
 struct epoll_event {
     uint32_t events;
@@ -87,6 +95,7 @@ static inline bool sc_enosys(long result) {
 /* Userspace fallback umask state until native kernel support lands. */
 static mode_t g_process_umask = 0022;
 static int g_process_nice = 0;
+static unsigned long g_memfd_seq = 0;
 
 static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *out) {
 	if (!in || !out) {
@@ -2573,13 +2582,64 @@ int sys_posix_madvise(void *addr, size_t length, int advice) {
 }
 
 int sys_memfd_create(const char *name, int flags, int *fd) {
-    (void)name;
-    (void)flags;
     if (!fd) {
         return EINVAL;
     }
     *fd = -1;
-    return ENOSYS;
+
+    unsigned int known_flags = MFD_CLOEXEC | MFD_ALLOW_SEALING;
+    if (flags & ~static_cast<int>(known_flags)) {
+        return EINVAL;
+    }
+
+    const char *raw_name = (name && name[0]) ? name : "anonymous";
+    char sanitized[33];
+    size_t raw_len = strlen(raw_name);
+    if (raw_len > 32) {
+        raw_len = 32;
+    }
+    for (size_t i = 0; i < raw_len; i++) {
+        char c = raw_name[i];
+        sanitized[i] = (c == '/') ? '_' : c;
+    }
+    sanitized[raw_len] = '\0';
+
+    int open_flags = O_RDWR | O_CREAT | O_EXCL;
+    if (flags & MFD_CLOEXEC) {
+        open_flags |= O_CLOEXEC;
+    }
+
+    const char *dirs[] = {"/tmp", "/dev/shm", "."};
+    char path[PATH_MAX];
+    pid_t pid = sys_getpid();
+    pid_t tid = sys_gettid();
+
+    for (size_t d = 0; d < (sizeof(dirs) / sizeof(dirs[0])); d++) {
+        for (int attempt = 0; attempt < 64; attempt++) {
+            unsigned long seq = __atomic_add_fetch(&g_memfd_seq, 1UL, __ATOMIC_RELAXED);
+            int n = snprintf(path, sizeof(path), "%s/.yolk-memfd-%d-%d-%lu-%s",
+                    dirs[d], static_cast<int>(pid), static_cast<int>(tid), seq, sanitized);
+            if (n <= 0 || static_cast<size_t>(n) >= sizeof(path)) {
+                return ENAMETOOLONG;
+            }
+
+            int local_fd = -1;
+            int e = sys_open(path, open_flags, 0600, &local_fd);
+            if (!e) {
+                (void)sys_unlink(path);
+                *fd = local_fd;
+                return 0;
+            }
+            if (e != EEXIST) {
+                if (e == ENOENT || e == ENOTDIR) {
+                    break;
+                }
+                return e;
+            }
+        }
+    }
+
+    return ENOSPC;
 }
 
 int sys_mincore(void *addr, size_t length, unsigned char *vec) {
@@ -2872,8 +2932,80 @@ int sys_sysconf(int num, long *ret) {
         case _SC_NPROCESSORS_ONLN:
             *ret = 1;
             return 0;
+        case _SC_ARG_MAX:
+            *ret = 2097152;
+            return 0;
+        case _SC_TZNAME_MAX:
+            *ret = -1;
+            return 0;
+        case _SC_PHYS_PAGES:
+            *ret = 1024;
+            return 0;
+        case _SC_AVPHYS_PAGES:
+            *ret = 1024;
+            return 0;
+        case _SC_GETPW_R_SIZE_MAX:
+            *ret = 1024;
+            return 0;
+        case _SC_GETGR_R_SIZE_MAX:
+            *ret = 1024;
+            return 0;
+        case _SC_CHILD_MAX:
+            *ret = 25;
+            return 0;
+        case _SC_JOB_CONTROL:
+            *ret = 1;
+            return 0;
+        case _SC_NGROUPS_MAX:
+            *ret = 65536;
+            return 0;
+        case _SC_RE_DUP_MAX:
+            *ret = RE_DUP_MAX;
+            return 0;
+        case _SC_LINE_MAX:
+            *ret = 2048;
+            return 0;
+        case _SC_XOPEN_CRYPT:
+            *ret = -1;
+            return 0;
+        case _SC_HOST_NAME_MAX:
+            *ret = HOST_NAME_MAX;
+            return 0;
+        case _SC_LOGIN_NAME_MAX:
+            *ret = LOGIN_NAME_MAX;
+            return 0;
+        case _SC_FSYNC:
+            *ret = _POSIX_FSYNC;
+            return 0;
+        case _SC_SAVED_IDS:
+            *ret = _POSIX_SAVED_IDS;
+            return 0;
+        case _SC_SYMLOOP_MAX:
+            *ret = 8;
+            return 0;
+        case _SC_VERSION:
+            *ret = _POSIX_VERSION;
+            return 0;
+        case _SC_2_VERSION:
+            *ret = _POSIX2_VERSION;
+            return 0;
+        case _SC_XOPEN_VERSION:
+            *ret = _XOPEN_VERSION;
+            return 0;
+        case _SC_MEMLOCK:
+            *ret = _POSIX_MEMLOCK;
+            return 0;
+        case _SC_MEMLOCK_RANGE:
+            *ret = _POSIX_MEMLOCK_RANGE;
+            return 0;
+        case _SC_MAPPED_FILES:
+            *ret = _POSIX_MAPPED_FILES;
+            return 0;
+        case _SC_SHARED_MEMORY_OBJECTS:
+            *ret = _POSIX_SHARED_MEMORY_OBJECTS;
+            return 0;
         default:
-            return ENOSYS;
+            return EINVAL;
     }
 }
 
