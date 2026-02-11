@@ -96,6 +96,7 @@ static inline bool sc_enosys(long result) {
 static mode_t g_process_umask = 0022;
 static int g_process_nice = 0;
 static unsigned long g_memfd_seq = 0;
+static unsigned long g_process_personality = 0;
 
 static void fill_statvfs_from_statfs(const struct statfs *in, struct statvfs *out) {
 	if (!in || !out) {
@@ -2562,12 +2563,12 @@ int sys_ioperm(unsigned long int from, unsigned long int num, int turn_on) {
     (void)from;
     (void)num;
     (void)turn_on;
-    return ENOSYS;
+    return EPERM;
 }
 
 int sys_iopl(int level) {
     (void)level;
-    return ENOSYS;
+    return EPERM;
 }
 
 int sys_madvise(void *addr, size_t length, int advice) {
@@ -2787,12 +2788,18 @@ int sys_pause() {
 }
 
 int sys_personality(unsigned long persona, int *out) {
-    (void)persona;
     if (!out) {
         return EINVAL;
     }
-    *out = 0;
-    return ENOSYS;
+    *out = static_cast<int>(g_process_personality);
+
+    /* Linux treats 0xFFFFFFFF as query-only. */
+    if (persona == 0xFFFFFFFFUL) {
+        return 0;
+    }
+
+    g_process_personality = persona;
+    return 0;
 }
 
 int sys_riscv_flush_icache(void *start, void *end, unsigned long flags) {
@@ -2836,7 +2843,7 @@ int sys_semget(key_t key, int n, int fl, int *id) {
 int sys_sethostname(const char *buffer, size_t bufsize) {
     (void)buffer;
     (void)bufsize;
-    return ENOSYS;
+    return EPERM;
 }
 
 int sys_shmat(void **seg_start, int shmid, const void *shmaddr, int shmflg) {
@@ -3123,7 +3130,7 @@ int sys_waitid(idtype_t idtype, id_t id, siginfo_t *info, int options) {
 
 int sys_chroot(const char *path) {
     (void)path;
-    return ENOSYS;
+    return EPERM;
 }
 
 void sys_yield() {
