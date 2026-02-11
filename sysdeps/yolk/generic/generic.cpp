@@ -2910,16 +2910,57 @@ int sys_sigtimedwait(const sigset_t *__restrict set, siginfo_t *__restrict info,
 }
 
 int sys_splice(int in_fd, off_t *in_off, int out_fd, off_t *out_off, size_t size, unsigned int flags, ssize_t *out) {
-    (void)in_fd;
-    (void)in_off;
-    (void)out_fd;
-    (void)out_off;
-    (void)size;
-    (void)flags;
-    if (out) {
-        *out = -1;
+    if (!out) {
+        return EINVAL;
     }
-    return ENOSYS;
+    *out = 0;
+
+    if (in_off || out_off) {
+        return EOPNOTSUPP;
+    }
+
+    if (flags != 0) {
+        return EOPNOTSUPP;
+    }
+
+    if (size == 0) {
+        return 0;
+    }
+
+    char buffer[16384];
+    size_t remaining = size;
+    while (remaining > 0) {
+        size_t chunk = remaining;
+        if (chunk > sizeof(buffer)) {
+            chunk = sizeof(buffer);
+        }
+
+        ssize_t nr = 0;
+        int e = sys_read(in_fd, buffer, chunk, &nr);
+        if (e) {
+            return (*out > 0) ? 0 : e;
+        }
+        if (nr <= 0) {
+            return 0;
+        }
+
+        size_t written = 0;
+        while (written < static_cast<size_t>(nr)) {
+            ssize_t nw = 0;
+            e = sys_write(out_fd, buffer + written, static_cast<size_t>(nr) - written, &nw);
+            if (e) {
+                return (*out > 0) ? 0 : e;
+            }
+            if (nw <= 0) {
+                return EIO;
+            }
+            written += static_cast<size_t>(nw);
+        }
+
+        *out += static_cast<ssize_t>(written);
+        remaining -= written;
+    }
+    return 0;
 }
 
 void sys_sync() {
@@ -3092,14 +3133,39 @@ int sys_times(struct tms *tms, clock_t *out) {
 }
 
 int sys_vm_remap(void *pointer, size_t size, size_t new_size, void **window) {
-    (void)pointer;
-    (void)size;
-    (void)new_size;
     if (!window) {
         return EINVAL;
     }
-    *window = nullptr;
-    return ENOSYS;
+
+    if (!pointer || size == 0 || new_size == 0) {
+        return EINVAL;
+    }
+
+    if (new_size == size) {
+        *window = pointer;
+        return 0;
+    }
+
+    void *new_window = nullptr;
+    int e = sys_vm_map(nullptr, new_size, PROT_READ | PROT_WRITE,
+            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0, &new_window);
+    if (e) {
+        return e;
+    }
+
+    size_t bytes_to_copy = (size < new_size) ? size : new_size;
+    if (bytes_to_copy > 0) {
+        memcpy(new_window, pointer, bytes_to_copy);
+    }
+
+    e = sys_vm_unmap(pointer, size);
+    if (e) {
+        (void)sys_vm_unmap(new_window, new_size);
+        return e;
+    }
+
+    *window = new_window;
+    return 0;
 }
 
 int sys_waitid(idtype_t idtype, id_t id, siginfo_t *info, int options) {
