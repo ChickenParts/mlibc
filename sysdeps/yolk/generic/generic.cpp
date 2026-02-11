@@ -1833,9 +1833,9 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         return 0;
     }
 
-    if (normalized.msg_controllen != 0) {
-        return EOPNOTSUPP;
-    }
+    /* Recv fallback can still provide payload via recvfrom(2) even when
+     * ancillary control data is requested; control metadata is dropped. */
+    bool control_requested = normalized.msg_controllen != 0;
 
     if (!hdr->msg_iov || hdr->msg_iovlen == 0) {
         socklen_t addrlen = normalized.msg_namelen;
@@ -1847,6 +1847,9 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         hdr->msg_namelen = addrlen;
         hdr->msg_controllen = 0;
         hdr->msg_flags = 0;
+        if (control_requested) {
+            hdr->msg_flags |= MSG_CTRUNC;
+        }
         *length = result;
         return 0;
     }
@@ -1896,6 +1899,9 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         hdr->msg_namelen = addrlen;
         hdr->msg_controllen = 0;
         hdr->msg_flags = 0;
+        if (control_requested) {
+            hdr->msg_flags |= MSG_CTRUNC;
+        }
         *length = result;
         return 0;
     }
@@ -1917,6 +1923,9 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
     hdr->msg_namelen = addrlen;
     hdr->msg_controllen = 0;
     hdr->msg_flags = 0;
+    if (control_requested) {
+        hdr->msg_flags |= MSG_CTRUNC;
+    }
     *length = result;
     return 0;
 }
