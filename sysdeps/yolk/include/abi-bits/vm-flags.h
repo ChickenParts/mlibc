@@ -1,1 +1,1 @@
-../../../../abis/yolk/vm.h
+../../../../abis/linux/vm-flags.h

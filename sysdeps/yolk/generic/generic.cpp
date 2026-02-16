@@ -926,8 +926,8 @@ int sys_read_entries(int handle, void *buffer, size_t max_size, size_t *bytes_re
         return sc_errno(result);
     }
 
-    /* Kernel returns entry count; mlibc dirent core expects byte count. */
-    *bytes_read = static_cast<size_t>(result) * sizeof(struct dirent);
+    /* Kernel returns byte count for packed dirent payload. */
+    *bytes_read = static_cast<size_t>(result);
     return 0;
 }
 
@@ -1038,7 +1038,7 @@ int sys_symlinkat(const char *target_path, int dirfd, const char *link_path) {
 	return symlink_e;
 }
 
-int sys_readlink(const char *path, char *buffer, size_t max_size, ssize_t *length) {
+int sys_readlink(const char *path, void *buffer, size_t max_size, ssize_t *length) {
     long result = __syscall3(SYS_readlink, (long)path, (long)buffer, max_size);
     if (result < 0) {
         return -result;
@@ -1053,7 +1053,7 @@ int sys_readlinkat(int dirfd, const char *path, void *buffer, size_t max_size, s
 	if (e) {
 		return e;
 	}
-	int readlink_e = sys_readlink(resolved, static_cast<char *>(buffer), max_size, length);
+	int readlink_e = sys_readlink(resolved, buffer, max_size, length);
 	free(resolved);
 	return readlink_e;
 }
