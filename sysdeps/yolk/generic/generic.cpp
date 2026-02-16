@@ -873,8 +873,18 @@ int sys_mkdir(const char *path, mode_t mode) {
 int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
     mode &= ~g_process_umask;
     long result = __syscall3(SYS_mkdirat_core, dirfd, (long)path, mode);
-    if (sc_enosys(result) && dirfd == AT_FDCWD) {
-        result = __syscall2(SYS_mkdir, (long)path, mode);
+    if (sc_enosys(result)) {
+        if (dirfd == AT_FDCWD) {
+            result = __syscall2(SYS_mkdir, (long)path, mode);
+        } else {
+            char *resolved = nullptr;
+            int e = resolve_dirfd_path(dirfd, path, &resolved);
+            if (e) {
+                return e;
+            }
+            result = __syscall2(SYS_mkdir, (long)resolved, mode);
+            free(resolved);
+        }
     }
     return sc_failed(result) ? sc_errno(result) : 0;
 }
