@@ -100,7 +100,7 @@ if not headers_only
 	libc_deps += libsmarter_dep
 	rtld_deps += libsmarter_dep
 
-	mlibc_c_args = ['-Wno-unused-function', '-D__MLIBC_BUILDING_MLIBC', '-nostdinc', '-fno-builtin', '-ffreestanding']
+	mlibc_c_args = ['-Wno-unused-function', '-D__MLIBC_BUILDING_MLIBC', '-D_GNU_SOURCE', '-nostdinc', '-fno-builtin', '-ffreestanding']
 	mlibc_link_args = ['-nostdlib']
 	add_project_arguments('-Werror=misleading-indentation', language: ['c', 'cpp'])
 	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')

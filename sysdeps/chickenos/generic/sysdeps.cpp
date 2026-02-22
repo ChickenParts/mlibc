@@ -10,7 +10,6 @@
 #include <mlibc/allocator.hpp>
 #include <mlibc/debug.hpp>
 #include <mlibc/all-sysdeps.hpp>
-#include <mlibc/thread-entry.hpp>
 #include <chickenos/syscall.hpp>
 
 #define STUB_ONLY { \

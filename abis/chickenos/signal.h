@@ -159,7 +159,7 @@ typedef void (*__sighandler) (int);
 #define SIGCANCEL 32
 #define SIGTIMER  33
 
-#if __MLIBC_XOPEN
+#if defined(_DEFAULT_SOURCE) || __MLIBC_XOPEN
 #define MINSIGSTKSZ 2048
 #define SIGSTKSZ 8192
 #define SS_ONSTACK 1
