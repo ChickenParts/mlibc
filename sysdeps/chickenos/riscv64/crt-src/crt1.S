@@ -1,3 +1,9 @@
+.section .data
+.hidden __dso_handle
+.global __dso_handle
+__dso_handle:
+	.quad 0
+
 .weak __global_pointer$
 .hidden __global_pointer$
 
