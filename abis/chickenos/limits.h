@@ -1,0 +1,19 @@
+#ifndef _ABIBITS_LIMITS_H
+#define _ABIBITS_LIMITS_H
+
+#define PATH_MAX 4096
+#define NAME_MAX 255
+#define LINE_MAX 2048
+#define PIPE_BUF 4096
+#define IOV_MAX 1024
+#define HOST_NAME_MAX 64
+#define SYMLOOP_MAX 40
+#define TTY_NAME_MAX 32
+#define LOGIN_NAME_MAX 256
+#define PTHREAD_STACK_MIN 16384
+#define NGROUPS_MAX 65536
+
+#define CHARCLASS_NAME_MAX 2048
+#define RE_DUP_MAX 255
+
+#endif
