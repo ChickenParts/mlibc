@@ -1,0 +1,17 @@
+[binaries]
+c = 'clang'
+cpp = 'clang++'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+
+[built-in options]
+c_args = ['-target', 'x86_64-unknown-elf', '-ffreestanding', '-nostdlib', '-mno-red-zone']
+cpp_args = ['-target', 'x86_64-unknown-elf', '-ffreestanding', '-nostdlib', '-mno-red-zone', '-fno-exceptions', '-fno-rtti']
+c_link_args = ['-target', 'x86_64-unknown-elf', '-nostdlib']
+cpp_link_args = ['-target', 'x86_64-unknown-elf', '-nostdlib']
+
+[host_machine]
+system = 'chickenos'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
