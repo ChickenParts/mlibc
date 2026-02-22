@@ -1,0 +1,21 @@
+#ifndef _ABIBITS_XATTR_H
+#define _ABIBITS_XATTR_H
+
+/* __USE_KERNEL_XATTR_DEFS is exported when XATTR_* are emitted, and
+ * __UAPI_DEF_XATTR is used to determine the behaviour of the
+ * <linux/xattr.h> header (through <linux/libc-compat.h>), if it's set
+ * to 1, the header exports xattr defines and __USE_KERNEL_XATTR_DEFS.
+ * This applies for pretty much all other defines in libc-compat.h
+ * AFAICT.
+ */
+#ifndef __USE_KERNEL_XATTR_DEFS
+enum {
+	XATTR_CREATE = 1,
+#define XATTR_CREATE XATTR_CREATE
+	XATTR_REPLACE = 2
+#define XATTR_REPLACE XATTR_REPLACE
+};
+#	define __UAPI_DEF_XATTR 0
+#endif
+
+#endif /* _ABIBITS_XATTR_H */
