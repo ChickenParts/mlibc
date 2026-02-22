@@ -1,0 +1,1 @@
+../../../../abis/chickenos/resource.h

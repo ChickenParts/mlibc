@@ -290,6 +290,10 @@ elif host_machine.system() == 'menix'
 elif host_machine.system() == 'demo'
 	subdir('sysdeps/demo')
 # ANCHOR_END: demo-sysdeps
+elif host_machine.system() == 'chickenos'
+	rtld_include_dirs += include_directories('sysdeps/chickenos/include')
+	libc_include_dirs += include_directories('sysdeps/chickenos/include')
+	subdir('sysdeps/chickenos')
 else
 	error('No sysdeps defined for OS: ' + host_machine.system())
 endif
