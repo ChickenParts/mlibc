@@ -526,6 +526,41 @@ int sys_sigaltstack(const stack_t *ss, stack_t *oss) {
 // Process identity
 // ---------------------------------------------------------------------------
 
+pid_t sys_getpid() {
+	auto ret = do_syscall(SYS_getpid);
+	return sc_int_result<pid_t>(ret);
+}
+
+pid_t sys_getppid() {
+	auto ret = do_syscall(SYS_getppid);
+	return sc_int_result<pid_t>(ret);
+}
+
+pid_t sys_gettid() {
+	auto ret = do_syscall(SYS_gettid);
+	return sc_int_result<pid_t>(ret);
+}
+
+uid_t sys_getuid() {
+	auto ret = do_syscall(SYS_getuid);
+	return sc_int_result<uid_t>(ret);
+}
+
+uid_t sys_geteuid() {
+	auto ret = do_syscall(SYS_geteuid);
+	return sc_int_result<uid_t>(ret);
+}
+
+gid_t sys_getgid() {
+	auto ret = do_syscall(SYS_getgid);
+	return sc_int_result<gid_t>(ret);
+}
+
+gid_t sys_getegid() {
+	auto ret = do_syscall(SYS_getegid);
+	return sc_int_result<gid_t>(ret);
+}
+
 int sys_setpgid(pid_t pid, pid_t pgid) {
 	auto ret = do_syscall(SYS_setpgid, pid, pgid);
 	if(int e = sc_error(ret); e)
