@@ -72,6 +72,7 @@
 #define SYS_fchmodat        0xA7
 #define SYS_fchownat        0xA8
 #define SYS_faccessat       0xA9
+#define SYS_renameat2       0xAA
 
 /* 0x0C0-0x0FF: Memory Management */
 #define SYS_mmap            0xC0
