@@ -21,6 +21,7 @@ libc_sources += files(
 	host_machine.cpu_family() / 'arch-syscall.cpp',
 	'generic/entry.cpp',
 	'generic/sysdeps.cpp',
+	'generic/mount.cpp',
 )
 
 if not no_headers
@@ -92,6 +93,12 @@ if not no_headers
 	install_headers(
 		'include/bits/syscall.h',
 		subdir: 'bits'
+	)
+
+	install_headers(
+		'include/sys/mount.h',
+		'include/sys/statfs.h',
+		subdir: 'sys'
 	)
 endif
 

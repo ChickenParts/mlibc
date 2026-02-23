@@ -830,20 +830,7 @@ int sys_getrusage(int scope, struct rusage *usage) {
 	return 0;
 }
 
-int sys_mount(const char *source, const char *target,
-		const char *fstype, unsigned long flags, const void *data) {
-	auto ret = do_syscall(SYS_mount, source, target, fstype, flags, data);
-	if(int e = sc_error(ret); e)
-		return e;
-	return 0;
-}
-
-int sys_umount2(const char *target, int flags) {
-	auto ret = do_syscall(SYS_umount2, target, flags);
-	if(int e = sc_error(ret); e)
-		return e;
-	return 0;
-}
+// mount/umount/statfs wrappers are in mount.cpp (ChickenOS-native, not linux option)
 
 void sys_yield() {
 	do_syscall(SYS_sched_yield);
@@ -901,20 +888,6 @@ int sys_madvise(void *addr, size_t length, int advice) {
 
 int sys_msync(void *addr, size_t length, int flags) {
 	auto ret = do_syscall(SYS_msync, addr, length, flags);
-	if(int e = sc_error(ret); e)
-		return e;
-	return 0;
-}
-
-int sys_statfs(const char *path, struct statfs *buf) {
-	auto ret = do_syscall(SYS_statfs, path, buf);
-	if(int e = sc_error(ret); e)
-		return e;
-	return 0;
-}
-
-int sys_fstatfs(int fd, struct statfs *buf) {
-	auto ret = do_syscall(SYS_fstatfs, fd, buf);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
