@@ -96,9 +96,11 @@ if not no_headers
 endif
 
 if not headers_only
+	crt_asm_args = c_compiler.cmd_array() + get_option('c_args') + ['-c', '-o', '@OUTPUT@', '@INPUT@']
+
 	crt = custom_target('crt1',
 		build_by_default: true,
-		command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+		command: crt_asm_args,
 		input: host_machine.cpu_family() / 'crt-src/crt1.S',
 		output: 'crt1.o',
 		install: true,
@@ -109,7 +111,7 @@ if not headers_only
 	if host_machine.cpu_family() != 'riscv64'
 		custom_target('crti',
 			build_by_default: true,
-			command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+			command: crt_asm_args,
 			input: host_machine.cpu_family() / 'crt-src/crti.S',
 			output: 'crti.o',
 			install: true,
@@ -118,7 +120,7 @@ if not headers_only
 
 		custom_target('crtn',
 			build_by_default: true,
-			command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+			command: crt_asm_args,
 			input: host_machine.cpu_family() / 'crt-src/crtn.S',
 			output: 'crtn.o',
 			install: true,

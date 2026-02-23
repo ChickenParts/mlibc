@@ -7,8 +7,8 @@ strip = 'llvm-strip'
 [built-in options]
 c_args = ['-target', 'x86_64-unknown-elf', '-ffreestanding', '-nostdlib', '-mno-red-zone']
 cpp_args = ['-target', 'x86_64-unknown-elf', '-ffreestanding', '-nostdlib', '-mno-red-zone', '-fno-exceptions', '-fno-rtti']
-c_link_args = ['-target', 'x86_64-unknown-elf', '-nostdlib']
-cpp_link_args = ['-target', 'x86_64-unknown-elf', '-nostdlib']
+c_link_args = ['-target', 'x86_64-unknown-elf', '-nostdlib', '-fuse-ld=lld', '/usr/lib64/clang/21/lib/linux/libclang_rt.builtins-x86_64.a']
+cpp_link_args = ['-target', 'x86_64-unknown-elf', '-nostdlib', '-fuse-ld=lld', '/usr/lib64/clang/21/lib/linux/libclang_rt.builtins-x86_64.a']
 
 [host_machine]
 system = 'chickenos'
