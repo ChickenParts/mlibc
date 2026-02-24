@@ -40,9 +40,11 @@ __mlibc_thread_entry:
     mov %r14, %rdi
     wrfsbase %rdi
 
-    /* Align stack to 16 bytes before call */
+    /* Align stack so the callee sees SysV-compliant entry alignment.
+     * Before `call`, RSP must be 16-byte aligned; the call push then
+     * leaves callee RSP % 16 == 8.
+     */
     and $-16, %rsp
-    sub $8, %rsp
 
     /* Call entry function: entry(user_arg) */
     mov %r13, %rdi
