@@ -12,7 +12,19 @@
 #include <mlibc-config.h>
 #include <mlibc/allocator.hpp>
 #include <mlibc/posix-sysdeps.hpp>
-#include <mlibc/debug.hpp>
+
+#if __has_include(<yolk/syscall.h>)
+#define MLIBC_YOLK_DIRENT_SHIMS 1
+extern "C" int __mlibc_yolk_sys_open_dir(const char *path, int *handle);
+extern "C" int __mlibc_yolk_sys_read_entries(int handle, void *buffer, size_t max_size, size_t *bytes_read);
+#endif
+
+static_assert(offsetof(struct dirent, d_ino) == 0);
+static_assert(offsetof(struct dirent, d_off) == 8);
+static_assert(offsetof(struct dirent, d_reclen) == 16);
+static_assert(offsetof(struct dirent, d_type) == 18);
+static_assert(offsetof(struct dirent, d_name) == 19);
+static_assert(sizeof(struct dirent) == 280);
 
 // Code taken from musl
 int alphasort(const struct dirent **a, const struct dirent **b) {
@@ -57,6 +69,15 @@ DIR *opendir(const char *path) {
 	dir->__ent_next = 0;
 	dir->__ent_limit = 0;
 
+#if defined(MLIBC_YOLK_DIRENT_SHIMS)
+	if(int e = __mlibc_yolk_sys_open_dir(path, &dir->__handle); e) {
+		errno = e;
+		frg::destruct(getAllocator(), dir);
+		return nullptr;
+	}else{
+		return dir;
+	}
+#else
 	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_open_dir, nullptr);
 	if(int e = mlibc::sys_open_dir(path, &dir->__handle); e) {
 		errno = e;
@@ -65,23 +86,52 @@ DIR *opendir(const char *path) {
 	}else{
 		return dir;
 	}
+#endif
+}
+
+static bool validate_dirent_record(DIR *dir, struct dirent *entp, size_t *reclen_out) {
+	if(dir->__ent_next > dir->__ent_limit)
+		return false;
+
+	size_t remaining = dir->__ent_limit - dir->__ent_next;
+	size_t reclen = entp->d_reclen;
+	size_t min_reclen = offsetof(struct dirent, d_name) + 1;
+	if(reclen < min_reclen || reclen > remaining)
+		return false;
+
+	size_t max_name_bytes = reclen - offsetof(struct dirent, d_name);
+	if(!memchr(entp->d_name, '\0', max_name_bytes))
+		return false;
+
+	*reclen_out = reclen;
+	return true;
 }
 
 struct dirent *readdir(DIR *dir) {
 	__ensure(dir->__ent_next <= dir->__ent_limit);
 	if(dir->__ent_next == dir->__ent_limit) {
+#if defined(MLIBC_YOLK_DIRENT_SHIMS)
+		if(int e = __mlibc_yolk_sys_read_entries(dir->__handle, dir->__ent_buffer, 2048, &dir->__ent_limit); e)
+			__ensure(!"__mlibc_yolk_sys_read_entries() failed");
+#else
 		MLIBC_CHECK_OR_ENOSYS(mlibc::sys_read_entries, nullptr);
 		if(int e = mlibc::sys_read_entries(dir->__handle, dir->__ent_buffer, 2048, &dir->__ent_limit); e)
 			__ensure(!"mlibc::sys_read_entries() failed");
+#endif
 		dir->__ent_next = 0;
 		if(!dir->__ent_limit)
 			return nullptr;
 	}
 
 	auto entp = reinterpret_cast<struct dirent *>(dir->__ent_buffer + dir->__ent_next);
+	size_t reclen = 0;
+	if(!validate_dirent_record(dir, entp, &reclen)) {
+		errno = EIO;
+		return nullptr;
+	}
 	// We only copy as many bytes as we need to avoid buffer-overflows.
 	memcpy(&dir->__current, entp, offsetof(struct dirent, d_name) + strlen(entp->d_name) + 1);
-	dir->__ent_next += entp->d_reclen;
+	dir->__ent_next += reclen;
 	return &dir->__current;
 }
 
@@ -90,15 +140,24 @@ struct dirent *readdir(DIR *dir) {
 #endif /* !__MLIBC_LINUX_OPTION */
 
 int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result) {
+#if defined(MLIBC_YOLK_DIRENT_SHIMS)
+	/* Uses direct Yolk syscall shims to avoid weak-sysdep null resolution. */
+#else
 	if(!mlibc::sys_read_entries) {
 		MLIBC_MISSING_SYSDEP();
 		return ENOSYS;
 	}
+#endif
 
 	__ensure(dir->__ent_next <= dir->__ent_limit);
 	if(dir->__ent_next == dir->__ent_limit) {
+#if defined(MLIBC_YOLK_DIRENT_SHIMS)
+		if(int e = __mlibc_yolk_sys_read_entries(dir->__handle, dir->__ent_buffer, 2048, &dir->__ent_limit); e)
+			__ensure(!"__mlibc_yolk_sys_read_entries() failed");
+#else
 		if(int e = mlibc::sys_read_entries(dir->__handle, dir->__ent_buffer, 2048, &dir->__ent_limit); e)
 			__ensure(!"mlibc::sys_read_entries() failed");
+#endif
 		dir->__ent_next = 0;
 		if(!dir->__ent_limit) {
 			*result = nullptr;
@@ -107,9 +166,14 @@ int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result) {
 	}
 
 	auto entp = reinterpret_cast<struct dirent *>(dir->__ent_buffer + dir->__ent_next);
+	size_t reclen = 0;
+	if(!validate_dirent_record(dir, entp, &reclen)) {
+		*result = nullptr;
+		return EIO;
+	}
 	// We only copy as many bytes as we need to avoid buffer-overflows.
 	memcpy(entry, entp, offsetof(struct dirent, d_name) + strlen(entp->d_name) + 1);
-	dir->__ent_next += entp->d_reclen;
+	dir->__ent_next += reclen;
 	*result = entry;
 	return 0;
 }

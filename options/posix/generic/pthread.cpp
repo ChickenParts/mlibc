@@ -20,6 +20,11 @@
 #include <mlibc/tid.hpp>
 #include <mlibc/threads.hpp>
 
+#if __has_include(<yolk/syscall.h>)
+#define MLIBC_YOLK_THREAD_SHIMS 1
+extern "C" [[noreturn]] void __mlibc_yolk_sys_thread_exit(void);
+#endif
+
 static bool enableTrace = false;
 
 struct ScopeTrace {
@@ -355,7 +360,11 @@ namespace {
 
 namespace mlibc {
 	__attribute__ ((__noreturn__)) void do_exit() {
+#if defined(MLIBC_YOLK_THREAD_SHIMS)
+		__mlibc_yolk_sys_thread_exit();
+#else
 		sys_thread_exit();
+#endif
 		__builtin_unreachable();
 	}
 } // namespace mlibc

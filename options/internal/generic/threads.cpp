@@ -9,6 +9,13 @@
 
 extern "C" Tcb *__rtld_allocateTcb();
 
+#if __has_include(<yolk/syscall.h>)
+#define MLIBC_YOLK_THREAD_SHIMS 1
+extern "C" int __mlibc_yolk_sys_clone(void *tcb, pid_t *tid_out, void *stack);
+extern "C" int __mlibc_yolk_sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb,
+		size_t *stack_size, size_t *guard_size, void **stack_base);
+#endif
+
 namespace mlibc {
 
 int thread_create(struct __mlibc_thread_data **__restrict thread, const struct __mlibc_threadattr *__restrict attrp, void *entry, void *__restrict user_arg, bool returns_int) {
@@ -29,6 +36,12 @@ int thread_create(struct __mlibc_thread_data **__restrict thread, const struct _
 	// when the stack is allocated. Currently this isn't propagated to the TCB,
 	// but it should be.
 	void *stack = attr.__mlibc_stackaddr;
+#if defined(MLIBC_YOLK_THREAD_SHIMS)
+	int ret = __mlibc_yolk_sys_prepare_stack(&stack, entry,
+			user_arg, new_tcb, &attr.__mlibc_stacksize, &attr.__mlibc_guardsize, &new_tcb->stackAddr);
+	if (ret)
+		return ret;
+#else
 	if (!mlibc::sys_prepare_stack) {
 		MLIBC_MISSING_SYSDEP();
 		return ENOSYS;
@@ -37,16 +50,23 @@ int thread_create(struct __mlibc_thread_data **__restrict thread, const struct _
 			user_arg, new_tcb, &attr.__mlibc_stacksize, &attr.__mlibc_guardsize, &new_tcb->stackAddr);
 	if (ret)
 		return ret;
+#endif
 
-	if (!mlibc::sys_clone) {
-		MLIBC_MISSING_SYSDEP();
-		return ENOSYS;
-	}
 	new_tcb->stackSize = attr.__mlibc_stacksize;
 	new_tcb->guardSize = attr.__mlibc_guardsize;
 	new_tcb->returnValueType = (returns_int) ? TcbThreadReturnValue::Integer : TcbThreadReturnValue::Pointer;
 	new_tcb->isJoinable = (attr.__mlibc_detachstate == __MLIBC_THREAD_CREATE_JOINABLE);
-	mlibc::sys_clone(new_tcb, &tid, stack);
+#if defined(MLIBC_YOLK_THREAD_SHIMS)
+	int clone_ret = __mlibc_yolk_sys_clone(new_tcb, &tid, stack);
+#else
+	if (!mlibc::sys_clone) {
+		MLIBC_MISSING_SYSDEP();
+		return ENOSYS;
+	}
+	int clone_ret = mlibc::sys_clone(new_tcb, &tid, stack);
+#endif
+	if (clone_ret)
+		return clone_ret;
 	*thread = reinterpret_cast<struct __mlibc_thread_data *>(new_tcb);
 
 	__atomic_store_n(&new_tcb->tid, tid, __ATOMIC_RELAXED);

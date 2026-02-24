@@ -248,6 +248,7 @@
 
 /* Service registration */
 #define SYS_service_register SYS_service_register_core
+#define SYS_arch_prctl      352
 
 /* Network/Socket syscalls - must match kernel nr.h (400-420 range) */
 #define SYS_socket          SYS_socket_core

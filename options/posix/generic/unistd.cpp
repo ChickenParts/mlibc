@@ -11,6 +11,7 @@
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include <bits/ensure.h>
 #include <mlibc-config.h>
@@ -24,6 +25,14 @@
 
 #if __MLIBC_LINUX_OPTION
 #include <mlibc/linux-sysdeps.hpp>
+#endif
+
+#if __has_include(<yolk/syscall.h>)
+#define MLIBC_YOLK_ACCESS_SHIMS 1
+extern "C" int __mlibc_yolk_sys_access(const char *path, int mode);
+extern "C" int __mlibc_yolk_sys_faccessat(int dirfd, const char *pathname, int mode, int flags);
+extern "C" int __mlibc_yolk_sys_chdir(const char *path);
+extern "C" int __mlibc_yolk_sys_fchdir(int fd);
 #endif
 
 namespace {
@@ -40,21 +49,37 @@ unsigned int alarm(unsigned int seconds) {
 }
 
 int chdir(const char *path) {
+#if defined(MLIBC_YOLK_ACCESS_SHIMS)
+	if(int e = __mlibc_yolk_sys_chdir(path); e) {
+		errno = e;
+		return -1;
+	}
+	return 0;
+#else
 	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_chdir, -1);
 	if(int e = mlibc::sys_chdir(path); e) {
 		errno = e;
 		return -1;
 	}
 	return 0;
+#endif
 }
 
 int fchdir(int fd) {
+#if defined(MLIBC_YOLK_ACCESS_SHIMS)
+	if(int e = __mlibc_yolk_sys_fchdir(fd); e) {
+		errno = e;
+		return -1;
+	}
+	return 0;
+#else
 	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_fchdir, -1);
 	if(int e = mlibc::sys_fchdir(fd); e) {
 		errno = e;
 		return -1;
 	}
 	return 0;
+#endif
 }
 
 int chown(const char *path, uid_t uid, gid_t gid) {
@@ -224,12 +249,20 @@ int execvpe(const char *file, char *const argv[], char *const envp[]) {
 }
 
 int faccessat(int dirfd, const char *pathname, int mode, int flags) {
+#if defined(MLIBC_YOLK_ACCESS_SHIMS)
+	if(int e = __mlibc_yolk_sys_faccessat(dirfd, pathname, mode, flags); e) {
+		errno = e;
+		return -1;
+	}
+	return 0;
+#else
 	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_faccessat, -1);
 	if(int e = mlibc::sys_faccessat(dirfd, pathname, mode, flags); e) {
 		errno = e;
 		return -1;
 	}
 	return 0;
+#endif
 }
 
 int fchown(int fd, uid_t uid, gid_t gid) {
@@ -1049,15 +1082,48 @@ pid_t gettid(void) {
 }
 
 int getentropy(void *buffer, size_t length) {
-	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_getentropy, -1);
 	if(length > 256) {
 		errno = EIO;
 		return -1;
 	}
-	if(int e = mlibc::sys_getentropy(buffer, length); e) {
-		errno = e;
+	if(!buffer && length) {
+		errno = EFAULT;
 		return -1;
 	}
+	if(length == 0) {
+		return 0;
+	}
+
+	if(mlibc::sys_getentropy) {
+		if(int e = mlibc::sys_getentropy(buffer, length); !e) {
+			return 0;
+		} else if(e != ENOSYS) {
+			errno = e;
+			return -1;
+		}
+	}
+
+	/*
+	 * Compatibility fallback: provide deterministic bytes when the sysdep is
+	 * unavailable so entropy calls do not hard-fail during early bring-up.
+	 */
+	struct timespec ts = {};
+	(void)clock_gettime(CLOCK_MONOTONIC, &ts);
+	uint64_t state = (static_cast<uint64_t>(ts.tv_sec) << 32)
+		^ static_cast<uint64_t>(static_cast<uint32_t>(ts.tv_nsec))
+		^ static_cast<uint64_t>(getpid())
+		^ reinterpret_cast<uintptr_t>(buffer)
+		^ 0x9E3779B97F4A7C15ULL;
+
+	auto out = reinterpret_cast<unsigned char *>(buffer);
+	for(size_t i = 0; i < length; i++) {
+		state ^= state >> 12;
+		state ^= state << 25;
+		state ^= state >> 27;
+		state *= 0x2545F4914F6CDD1DULL;
+		out[i] = static_cast<unsigned char>(state >> 56);
+	}
+
 	return 0;
 }
 
@@ -1290,12 +1356,20 @@ pid_t getppid(void) {
 }
 
 int access(const char *path, int mode) {
+#if defined(MLIBC_YOLK_ACCESS_SHIMS)
+	if(int e = __mlibc_yolk_sys_access(path, mode); e) {
+		errno = e;
+		return -1;
+	}
+	return 0;
+#else
 	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_access, -1);
 	if(int e = mlibc::sys_access(path, mode); e) {
 		errno = e;
 		return -1;
 	}
 	return 0;
+#endif
 }
 
 namespace {

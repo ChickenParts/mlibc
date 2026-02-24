@@ -260,6 +260,7 @@ static void iov_scatter_bytes(const void *src, size_t src_len, const struct iove
 	}
 }
 
+#ifndef MLIBC_BUILDING_RTLD
 static int resolve_dirfd_path(int dirfd, const char *path, char **resolved_path) {
 	if (!path || !resolved_path) {
 		return EINVAL;
@@ -322,6 +323,7 @@ static int resolve_dirfd_path(int dirfd, const char *path, char **resolved_path)
 	*resolved_path = joined;
 	return 0;
 }
+#endif
 
 /* Forward declarations for local cross-calls. */
 int sys_isatty(int fd);
@@ -354,10 +356,11 @@ void sys_libc_log(const char *message) {
 
 #if defined(__x86_64__)
 int sys_tcb_set(void *pointer) {
-    /* x86_64: Use ARCH_SET_FS via arch_prctl equivalent */
-    /* For now, we'll use the FSBASE MSR directly via syscall */
-    /* Yolk should implement arch_prctl or we use inline asm */
-    __asm__ volatile("wrfsbase %0" :: "r"(pointer) : "memory");
+    constexpr long ARCH_SET_FS = 0x1002;
+    long result = __syscall2(SYS_arch_prctl, ARCH_SET_FS, (long)pointer);
+    if (result < 0 && result > -4096) {
+        return -result;
+    }
     return 0;
 }
 #elif defined(__aarch64__)
@@ -870,6 +873,7 @@ int sys_mkdir(const char *path, mode_t mode) {
     return result < 0 ? -result : 0;
 }
 
+#ifndef MLIBC_BUILDING_RTLD
 int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
     mode &= ~g_process_umask;
     long result = __syscall3(SYS_mkdirat_core, dirfd, (long)path, mode);
@@ -926,8 +930,14 @@ int sys_read_entries(int handle, void *buffer, size_t max_size, size_t *bytes_re
         return sc_errno(result);
     }
 
-    /* Kernel returns byte count for packed dirent payload. */
-    *bytes_read = static_cast<size_t>(result);
+    /*
+     * Yolk getdents ABI returns entry count.
+     * Convert to packed byte size for dirent buffer consumers.
+     */
+    if (static_cast<size_t>(result) > (max_size / sizeof(struct dirent))) {
+        return EIO;
+    }
+    *bytes_read = static_cast<size_t>(result) * sizeof(struct dirent);
     return 0;
 }
 
@@ -1183,6 +1193,7 @@ int sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2
     }
     return sc_failed(result) ? sc_errno(result) : 0;
 }
+#endif
 
 /* =============================================================================
  * Process Control
@@ -1485,8 +1496,10 @@ int sys_tgkill(pid_t tgid, pid_t tid, int sig) {
 }
 
 /* Signal restorer trampolines (defined in x86_64/signals.S) */
+#ifndef MLIBC_BUILDING_RTLD
 extern "C" void __mlibc_signal_restore(void);
 extern "C" void __mlibc_signal_restore_rt(void);
+#endif
 
 #ifndef SA_RESTORER
 #define SA_RESTORER 0x04000000
@@ -1494,6 +1507,10 @@ extern "C" void __mlibc_signal_restore_rt(void);
 
 int sys_sigaction(int signum, const struct sigaction *act,
                   struct sigaction *oldact) {
+#ifdef MLIBC_BUILDING_RTLD
+    long result = __syscall3(SYS_sigaction_core, signum, (long)act, (long)oldact);
+    return result < 0 ? -result : 0;
+#else
     /* If setting a new action, install our signal restorer trampoline */
     if (act && (act->sa_flags & SA_RESTORER) == 0) {
         struct sigaction modified_act = *act;
@@ -1507,6 +1524,7 @@ int sys_sigaction(int signum, const struct sigaction *act,
     }
     long result = __syscall3(SYS_sigaction_core, signum, (long)act, (long)oldact);
     return result < 0 ? -result : 0;
+#endif
 }
 
 int sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
@@ -1789,6 +1807,14 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
         return EINVAL;
     }
 
+#ifdef MLIBC_BUILDING_RTLD
+    long rtld_result = __syscall3(SYS_sendmsg_core, fd, (long)hdr, flags);
+    if (sc_failed(rtld_result)) {
+        return sc_errno(rtld_result);
+    }
+    *length = rtld_result;
+    return 0;
+#else
     if (!hdr) {
         long result = __syscall6(SYS_sendto_core, fd, 0, 0, flags, 0, 0);
         if (sc_failed(result)) {
@@ -1885,6 +1911,7 @@ int sys_msg_send(int fd, const struct msghdr *hdr, int flags, ssize_t *length) {
     }
     *length = result;
     return 0;
+#endif
 }
 
 int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
@@ -1892,6 +1919,14 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
         return EINVAL;
     }
 
+#ifdef MLIBC_BUILDING_RTLD
+    long rtld_result = __syscall3(SYS_recvmsg_core, fd, (long)hdr, flags);
+    if (sc_failed(rtld_result)) {
+        return sc_errno(rtld_result);
+    }
+    *length = rtld_result;
+    return 0;
+#else
     if (!hdr) {
         socklen_t addrlen = 0;
         long result = __syscall6(SYS_recvfrom_core, fd, 0, 0, flags, 0, (long)&addrlen);
@@ -2023,6 +2058,7 @@ int sys_msg_recv(int fd, struct msghdr *hdr, int flags, ssize_t *length) {
     }
     *length = result;
     return 0;
+#endif
 }
 
 int sys_setsockopt(int fd, int layer, int number, const void *buffer,
@@ -2181,6 +2217,18 @@ int sys_ppoll(struct pollfd *fds, nfds_t count, const struct timespec *timeout,
 int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
                 const struct timespec *timeout, const sigset_t *sigmask,
                 int *num_events) {
+#ifdef MLIBC_BUILDING_RTLD
+    if (!num_events) {
+        return EINVAL;
+    }
+    long result = __syscall6(SYS_pselect_core, nfds, (long)read_set, (long)write_set,
+                             (long)except_set, (long)timeout, (long)sigmask);
+    if (sc_failed(result)) {
+        return sc_errno(result);
+    }
+    *num_events = result;
+    return 0;
+#else
     long result = __syscall6(SYS_pselect_core, nfds, (long)read_set, (long)write_set,
                              (long)except_set, (long)timeout, (long)sigmask);
     if (sc_enosys(result)) {
@@ -2268,6 +2316,7 @@ int sys_pselect(int nfds, fd_set *read_set, fd_set *write_set, fd_set *except_se
     }
     *num_events = result;
     return 0;
+#endif
 }
 
 /* =============================================================================
@@ -2664,11 +2713,17 @@ int sys_if_indextoname(unsigned int index, char *name) {
         return EINVAL;
     }
     if (index == 1) {
-        strcpy(name, "lo");
+        name[0] = 'l';
+        name[1] = 'o';
+        name[2] = '\0';
         return 0;
     }
     if (index == 2) {
-        strcpy(name, "eth0");
+        name[0] = 'e';
+        name[1] = 't';
+        name[2] = 'h';
+        name[3] = '0';
+        name[4] = '\0';
         return 0;
     }
     return ENXIO;
@@ -2678,11 +2733,12 @@ int sys_if_nametoindex(const char *name, unsigned int *ret) {
     if (!name || !ret) {
         return EINVAL;
     }
-    if (!strcmp(name, "lo")) {
+    if (name[0] == 'l' && name[1] == 'o' && name[2] == '\0') {
         *ret = 1;
         return 0;
     }
-    if (!strcmp(name, "eth0")) {
+    if (name[0] == 'e' && name[1] == 't' && name[2] == 'h'
+            && name[3] == '0' && name[4] == '\0') {
         *ret = 2;
         return 0;
     }
@@ -2723,6 +2779,14 @@ int sys_posix_madvise(void *addr, size_t length, int advice) {
 }
 
 int sys_memfd_create(const char *name, int flags, int *fd) {
+#ifdef MLIBC_BUILDING_RTLD
+    (void)name;
+    (void)flags;
+    if (fd) {
+        *fd = -1;
+    }
+    return ENOSYS;
+#else
     if (!fd) {
         return EINVAL;
     }
@@ -2781,6 +2845,7 @@ int sys_memfd_create(const char *name, int flags, int *fd) {
     }
 
     return ENOSPC;
+#endif
 }
 
 int sys_mincore(void *addr, size_t length, unsigned char *vec) {
@@ -2854,6 +2919,12 @@ int sys_openpt(int oflags, int *fd) {
 }
 
 int sys_ptsname(int fd, char *buffer, size_t length) {
+#ifdef MLIBC_BUILDING_RTLD
+    (void)fd;
+    (void)buffer;
+    (void)length;
+    return ENOSYS;
+#else
     if (!buffer || length == 0) {
         return EINVAL;
     }
@@ -2874,6 +2945,7 @@ int sys_ptsname(int fd, char *buffer, size_t length) {
     }
     memcpy(buffer, fallback, sizeof(fallback));
     return 0;
+#endif
 }
 
 int sys_unlockpt(int fd) {
@@ -2882,6 +2954,14 @@ int sys_unlockpt(int fd) {
 }
 
 int sys_openpty(int *mfd, int *sfd, char *name, const struct termios *ios, const struct winsize *win) {
+#ifdef MLIBC_BUILDING_RTLD
+    (void)mfd;
+    (void)sfd;
+    (void)name;
+    (void)ios;
+    (void)win;
+    return ENOSYS;
+#else
     if (!mfd || !sfd) {
         return EINVAL;
     }
@@ -2920,6 +3000,7 @@ int sys_openpty(int *mfd, int *sfd, char *name, const struct termios *ios, const
         (void)sys_ioctl(*sfd, TIOCSWINSZ, (void *)win, &ignored);
     }
     return 0;
+#endif
 }
 
 int sys_pause() {
@@ -3410,3 +3491,65 @@ void sys_yield() {
 }
 
 }  // namespace mlibc
+
+extern "C" int __mlibc_yolk_sys_access(const char *path, int mode) {
+	long result = __syscall2(SYS_access, (long)path, mode);
+	return result < 0 ? -result : 0;
+}
+
+extern "C" int __mlibc_yolk_sys_faccessat(int dirfd, const char *pathname, int mode, int flags) {
+	long result = __syscall4(SYS_faccessat_core, dirfd, (long)pathname, mode, flags);
+	if (mlibc::sc_enosys(result)) {
+		if (flags != 0) {
+			return EINVAL;
+		}
+		if (dirfd != AT_FDCWD && pathname && pathname[0] != '/') {
+			return ENOSYS;
+		}
+		result = __syscall2(SYS_access, (long)pathname, mode);
+	}
+	return mlibc::sc_failed(result) ? mlibc::sc_errno(result) : 0;
+}
+
+extern "C" int __mlibc_yolk_sys_chdir(const char *path) {
+	long result = __syscall1(SYS_chdir, (long)path);
+	return result < 0 ? -result : 0;
+}
+
+extern "C" int __mlibc_yolk_sys_fchdir(int fd) {
+	long result = __syscall1(SYS_fchdir, fd);
+	return result < 0 ? -result : 0;
+}
+
+extern "C" int __mlibc_yolk_sys_open_dir(const char *path, int *handle) {
+	if (!handle) {
+		return EINVAL;
+	}
+
+	long result = __syscall3(SYS_open, (long)path, O_RDONLY | O_DIRECTORY, 0);
+	if (result < 0) {
+		return -result;
+	}
+
+	*handle = static_cast<int>(result);
+	return 0;
+}
+
+extern "C" int __mlibc_yolk_sys_read_entries(int handle, void *buffer, size_t max_size, size_t *bytes_read) {
+	if (!bytes_read) {
+		return EINVAL;
+	}
+
+	long result = __syscall3(SYS_getdents, handle, (long)buffer, max_size);
+	if (result < 0) {
+		return -result;
+	}
+
+	/* Yolk getdents ABI returns entry count; convert to packed byte size. */
+	if (static_cast<size_t>(result) > (max_size / sizeof(struct dirent))) {
+		return EIO;
+	}
+
+	*bytes_read = static_cast<size_t>(result) * sizeof(struct dirent);
+	return 0;
+}

@@ -209,3 +209,23 @@ int sys_prepare_stack(
 }
 
 }  /* namespace mlibc */
+
+extern "C" int __mlibc_yolk_sys_clone(void *tcb, pid_t *tid_out, void *stack) {
+    return mlibc::sys_clone(tcb, tid_out, stack);
+}
+
+extern "C" int __mlibc_yolk_sys_prepare_stack(
+    void **stack,
+    void *entry,
+    void *user_arg,
+    void *tcb,
+    size_t *stack_size,
+    size_t *guard_size,
+    void **stack_base
+) {
+    return mlibc::sys_prepare_stack(stack, entry, user_arg, tcb, stack_size, guard_size, stack_base);
+}
+
+extern "C" [[noreturn]] void __mlibc_yolk_sys_thread_exit(void) {
+    mlibc::sys_thread_exit();
+}
