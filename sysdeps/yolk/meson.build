@@ -8,10 +8,6 @@ sysdep_supported_options = {
 	'bsd': true,    # For bsd-sysdeps.hpp header (weak symbols only)
 }
 
-rtld_sources += files(
-	'generic/generic.cpp',
-)
-
 # Provide _DYNAMIC symbol for ld.so (shared dynamic linker)
 if host_machine.cpu_family() == 'x86_64'
 	rtld_dso_sources += files('x86_64/rtld-syms.S')
