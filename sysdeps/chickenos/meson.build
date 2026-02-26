@@ -22,6 +22,7 @@ libc_sources += files(
 	'generic/entry.cpp',
 	'generic/sysdeps.cpp',
 	'generic/mount.cpp',
+	'generic/thread.cpp',
 )
 
 if not no_headers
