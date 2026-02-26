@@ -3526,7 +3526,7 @@ extern "C" int __mlibc_yolk_sys_open_dir(const char *path, int *handle) {
 		return EINVAL;
 	}
 
-	long result = __syscall3(SYS_open, (long)path, O_RDONLY | O_DIRECTORY, 0);
+	long result = __syscall4(SYS_open_core, (long)path, O_RDONLY | O_DIRECTORY, 0, AT_FDCWD);
 	if (result < 0) {
 		return -result;
 	}
