@@ -95,6 +95,9 @@ extern "C" void relocateSelf() {
 	size_t rel_size = 0;
 	size_t relr_offset = 0;
 	size_t relr_size = 0;
+	size_t jmprel_offset = 0;
+	size_t jmprel_size = 0;
+	uintptr_t symtab_addr = 0;
 	for(size_t i = 0; _DYNAMIC[i].d_tag != DT_NULL; i++) {
 		auto ent = &_DYNAMIC[i];
 		switch(ent->d_tag) {
@@ -104,6 +107,9 @@ extern "C" void relocateSelf() {
 		case DT_RELASZ: rela_size = ent->d_un.d_val; break;
 		case DT_RELR: relr_offset = ent->d_un.d_ptr; break;
 		case DT_RELRSZ: relr_size = ent->d_un.d_val; break;
+		case DT_JMPREL: jmprel_offset = ent->d_un.d_ptr; break;
+		case DT_PLTRELSZ: jmprel_size = ent->d_un.d_val; break;
+		case DT_SYMTAB: symtab_addr = ent->d_un.d_ptr; break;
 		}
 	}
 
@@ -123,6 +129,23 @@ extern "C" void relocateSelf() {
 			break;
 		default:
 			__builtin_trap();
+		}
+	}
+
+	// Process JMPREL (PLT relocations) eagerly so ld.so's own PLT calls work.
+	// All JUMP_SLOT targets in ld.so reference symbols defined within ld.so itself,
+	// so we resolve them by looking up the symbol value and adding ldso_base.
+	if(jmprel_size && symtab_addr) {
+		auto symtab = reinterpret_cast<elf_sym *>(ldso_base + symtab_addr);
+		for(size_t disp = 0; disp < jmprel_size; disp += sizeof(elf_rela)) {
+			auto reloc = reinterpret_cast<elf_rela *>(ldso_base + jmprel_offset + disp);
+			auto sym_idx = ELF_R_SYM(reloc->r_info);
+			auto p = reinterpret_cast<uint64_t *>(ldso_base + reloc->r_offset);
+			if(sym_idx) {
+				*p = ldso_base + symtab[sym_idx].st_value;
+			} else {
+				*p = ldso_base + reloc->r_addend;
+			}
 		}
 	}
 
@@ -360,6 +383,9 @@ extern "C" void *interpreterMain(uintptr_t *entry_stack) {
 		case DT_RELRSZ:
 		case DT_RELRENT:
 		case DT_PLTGOT:
+		case DT_JMPREL:
+		case DT_PLTRELSZ:
+		case DT_PLTREL:
 		case DT_BIND_NOW:
 			continue;
 		case DT_FLAGS: {
