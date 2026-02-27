@@ -35,10 +35,13 @@ pid_t wait(int *status) {
 }
 
 pid_t wait3(int *status, int options, struct rusage *rusage) {
-	(void) rusage;
-	mlibc::infoLogger() << "\e[31mmlibc: wait3() is not implemented correctly\e[39m"
-		<< frg::endlog;
-	return waitpid(-1, status, options);
+	pid_t ret;
+	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_waitpid, -1);
+	if(int e = mlibc::sys_waitpid(-1, status, options, rusage, &ret); e) {
+		errno = e;
+		return -1;
+	}
+	return ret;
 }
 
 pid_t wait4(pid_t pid, int *status, int options, struct rusage *ru) {
