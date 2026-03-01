@@ -103,6 +103,7 @@ if not no_headers
 	install_headers(
 		'include/sys/mount.h',
 		'include/sys/statfs.h',
+		'include/sys/syscall.h',
 		subdir: 'sys'
 	)
 
