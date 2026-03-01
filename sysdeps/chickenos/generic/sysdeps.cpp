@@ -1593,3 +1593,33 @@ int sys_iopl(int level) {
 #endif // __MLIBC_POSIX_OPTION
 
 } // namespace mlibc
+
+// C-linkage syscall() wrapper — used by programs that call syscalls directly.
+#include <stdarg.h>
+
+extern "C" long syscall(long number, ...) {
+	va_list ap;
+	va_start(ap, number);
+	long a1 = va_arg(ap, long);
+	long a2 = va_arg(ap, long);
+	long a3 = va_arg(ap, long);
+	long a4 = va_arg(ap, long);
+	long a5 = va_arg(ap, long);
+	long a6 = va_arg(ap, long);
+	va_end(ap);
+
+	auto ret = __do_syscall6(number, a1, a2, a3, a4, a5, a6);
+	long v = static_cast<long>(ret);
+	if (v < 0 && v > -4096L) {
+		errno = -v;
+		return -1;
+	}
+	return v;
+}
+
+// readahead() stub — not yet implemented in ChickenOS.
+extern "C" __attribute__((weak))
+ssize_t readahead(int, off64_t, size_t) {
+	errno = ENOSYS;
+	return -1;
+}

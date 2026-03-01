@@ -1,6 +1,6 @@
 sysdep_supported_options = {
 	'posix': true,
-	'linux': false,
+	'linux': true,
 	'glibc': true,
 	'bsd': false,
 }
@@ -92,6 +92,10 @@ if not no_headers
 	)
 
 	install_headers(
+		'include/utmp.h',
+	)
+
+	install_headers(
 		'include/bits/syscall.h',
 		subdir: 'bits'
 	)
@@ -100,6 +104,12 @@ if not no_headers
 		'include/sys/mount.h',
 		'include/sys/statfs.h',
 		subdir: 'sys'
+	)
+
+	install_headers(
+		'include/asm/ioctl.h',
+		'include/asm/ioctls.h',
+		subdir: 'asm'
 	)
 endif
 
