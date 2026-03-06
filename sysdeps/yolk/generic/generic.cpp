@@ -930,14 +930,10 @@ int sys_read_entries(int handle, void *buffer, size_t max_size, size_t *bytes_re
         return sc_errno(result);
     }
 
-    /*
-     * Yolk getdents ABI returns entry count.
-     * Convert to packed byte size for dirent buffer consumers.
-     */
-    if (static_cast<size_t>(result) > (max_size / sizeof(struct dirent))) {
+    if (static_cast<size_t>(result) > max_size) {
         return EIO;
     }
-    *bytes_read = static_cast<size_t>(result) * sizeof(struct dirent);
+    *bytes_read = static_cast<size_t>(result);
     return 0;
 }
 
@@ -3545,11 +3541,10 @@ extern "C" int __mlibc_yolk_sys_read_entries(int handle, void *buffer, size_t ma
 		return -result;
 	}
 
-	/* Yolk getdents ABI returns entry count; convert to packed byte size. */
-	if (static_cast<size_t>(result) > (max_size / sizeof(struct dirent))) {
+	if (static_cast<size_t>(result) > max_size) {
 		return EIO;
 	}
 
-	*bytes_read = static_cast<size_t>(result) * sizeof(struct dirent);
+	*bytes_read = static_cast<size_t>(result);
 	return 0;
 }

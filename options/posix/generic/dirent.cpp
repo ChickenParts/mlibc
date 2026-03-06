@@ -107,8 +107,17 @@ static bool validate_dirent_record(DIR *dir, struct dirent *entp, size_t *reclen
 	return true;
 }
 
+static bool dir_cursor_sane(DIR *dir) {
+	return dir->__ent_next <= dir->__ent_limit
+		&& dir->__ent_limit <= sizeof(dir->__ent_buffer);
+}
+
 struct dirent *readdir(DIR *dir) {
-	__ensure(dir->__ent_next <= dir->__ent_limit);
+	if(!dir_cursor_sane(dir)) {
+		// Recover from corrupted cursor state by forcing a refill.
+		dir->__ent_next = 0;
+		dir->__ent_limit = 0;
+	}
 	if(dir->__ent_next == dir->__ent_limit) {
 #if defined(MLIBC_YOLK_DIRENT_SHIMS)
 		if(int e = __mlibc_yolk_sys_read_entries(dir->__handle, dir->__ent_buffer, 2048, &dir->__ent_limit); e)
@@ -119,6 +128,10 @@ struct dirent *readdir(DIR *dir) {
 			__ensure(!"mlibc::sys_read_entries() failed");
 #endif
 		dir->__ent_next = 0;
+		if(dir->__ent_limit > sizeof(dir->__ent_buffer)) {
+			errno = EIO;
+			return nullptr;
+		}
 		if(!dir->__ent_limit)
 			return nullptr;
 	}
@@ -149,7 +162,11 @@ int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result) {
 	}
 #endif
 
-	__ensure(dir->__ent_next <= dir->__ent_limit);
+	if(!dir_cursor_sane(dir)) {
+		// Recover from corrupted cursor state by forcing a refill.
+		dir->__ent_next = 0;
+		dir->__ent_limit = 0;
+	}
 	if(dir->__ent_next == dir->__ent_limit) {
 #if defined(MLIBC_YOLK_DIRENT_SHIMS)
 		if(int e = __mlibc_yolk_sys_read_entries(dir->__handle, dir->__ent_buffer, 2048, &dir->__ent_limit); e)
@@ -159,6 +176,10 @@ int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result) {
 			__ensure(!"mlibc::sys_read_entries() failed");
 #endif
 		dir->__ent_next = 0;
+		if(dir->__ent_limit > sizeof(dir->__ent_buffer)) {
+			*result = nullptr;
+			return EIO;
+		}
 		if(!dir->__ent_limit) {
 			*result = nullptr;
 			return 0;
