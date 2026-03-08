@@ -39,17 +39,6 @@
 #include <abi-bits/statfs.h>
 #include <bits/winsize.h>  /* For struct winsize */
 
-#define TIOCGWINSZ 0x5413
-#define TCGETS    0x5401
-#define TCSETS    0x5402
-#define TCSETSW   0x5403
-#define TCSETSF   0x5404
-#define TCSBRK    0x5409
-#define TCXONC    0x540A
-#define TCFLSH    0x540B
-#define TIOCGPTN  0x80045430
-#define TIOCSWINSZ 0x5414
-
 #ifndef MFD_CLOEXEC
 #define MFD_CLOEXEC 0x0001U
 #endif

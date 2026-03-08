@@ -10,6 +10,7 @@ libc_include_dirs += include_directories('.')
 install_headers(
     'abi.h',
     'fcntl.h',
+    'termios.h',
     'mman.h',
     'stat.h',
     'vm.h',

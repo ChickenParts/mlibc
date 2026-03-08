@@ -43,7 +43,7 @@ if not no_headers
 		follow_symlinks: true
 	)
 
-	# Install abi-bits headers (symlinks to abis/linux with yolk overrides)
+	# Install abi-bits headers (Yolk-native overrides where defined).
 	install_headers(
 		'include/abi-bits/auxv.h',
 		'include/abi-bits/seek-whence.h',

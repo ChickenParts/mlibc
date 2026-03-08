@@ -6,6 +6,23 @@
 #ifndef _ABIBITS_IOCTLS_H
 #define _ABIBITS_IOCTLS_H
 
+/* Core terminal ioctls */
+#define TCGETS   0x5401
+#define TCSETS   0x5402
+#define TCSETSW  0x5403
+#define TCSETSF  0x5404
+#define TCSBRK   0x5409
+#define TCXONC   0x540A
+#define TCFLSH   0x540B
+#define TIOCSCTTY 0x540E
+#define TIOCGPGRP 0x540F
+#define TIOCSPGRP 0x5410
+#define TIOCOUTQ  0x5411
+#define TIOCGWINSZ 0x5413
+#define TIOCSWINSZ 0x5414
+#define TIOCGSID  0x5429
+#define TIOCGPTN  0x80045430
+
 /* Terminal exclusive modes */
 #define TIOCEXCL 0x540C
 #define TIOCNXCL 0x540D
