@@ -1,1 +1,1 @@
-../../../../abis/linux/random.h
+../../../../abis/yolk/random.h

@@ -1,1 +1,1 @@
-../../../../abis/linux/statvfs.h
+../../../../abis/yolk/statvfs.h

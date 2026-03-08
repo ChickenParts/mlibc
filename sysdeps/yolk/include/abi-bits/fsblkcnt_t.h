@@ -1,1 +1,1 @@
-../../../../abis/linux/fsblkcnt_t.h
+../../../../abis/yolk/fsblkcnt_t.h

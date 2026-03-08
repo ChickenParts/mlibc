@@ -1,1 +1,1 @@
-../../../../abis/linux/ptrace.h
+../../../../abis/yolk/ptrace.h

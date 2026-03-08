@@ -1,1 +1,1 @@
-../../../../abis/linux/sem.h
+../../../../abis/yolk/sem.h

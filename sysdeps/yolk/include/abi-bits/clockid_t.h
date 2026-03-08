@@ -1,1 +1,1 @@
-../../../../abis/linux/clockid_t.h
+../../../../abis/yolk/clockid_t.h

@@ -1,1 +1,1 @@
-../../../../abis/linux/errno.h
+../../../../abis/yolk/errno.h

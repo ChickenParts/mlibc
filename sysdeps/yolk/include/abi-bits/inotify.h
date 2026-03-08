@@ -1,1 +1,1 @@
-../../../../abis/linux/inotify.h
+../../../../abis/yolk/inotify.h

@@ -1,1 +1,1 @@
-../../../../abis/linux/utmp-defines.h
+../../../../abis/yolk/utmp-defines.h

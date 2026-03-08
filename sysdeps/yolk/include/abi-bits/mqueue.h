@@ -1,1 +1,1 @@
-../../../../abis/linux/mqueue.h
+../../../../abis/yolk/mqueue.h

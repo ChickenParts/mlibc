@@ -1,1 +1,1 @@
-../../../../abis/linux/utmpx.h
+../../../../abis/yolk/utmpx.h

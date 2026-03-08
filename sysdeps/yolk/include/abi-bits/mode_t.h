@@ -1,1 +1,1 @@
-../../../../abis/linux/mode_t.h
+../../../../abis/yolk/mode_t.h

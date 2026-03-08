@@ -1,1 +1,1 @@
-../../../../abis/linux/vt.h
+../../../../abis/yolk/vt.h

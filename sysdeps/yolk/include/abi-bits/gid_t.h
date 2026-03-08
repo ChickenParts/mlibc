@@ -1,1 +1,1 @@
-../../../../abis/linux/gid_t.h
+../../../../abis/yolk/gid_t.h

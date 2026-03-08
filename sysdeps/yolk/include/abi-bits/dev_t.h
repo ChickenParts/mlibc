@@ -1,1 +1,1 @@
-../../../../abis/linux/dev_t.h
+../../../../abis/yolk/dev_t.h

@@ -1,1 +1,1 @@
-../../../../abis/linux/statx.h
+../../../../abis/yolk/statx.h

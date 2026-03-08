@@ -1,1 +1,1 @@
-../../../../abis/linux/uid_t.h
+../../../../abis/yolk/uid_t.h

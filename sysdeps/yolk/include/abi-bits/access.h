@@ -1,1 +1,1 @@
-../../../../abis/linux/access.h
+../../../../abis/yolk/access.h

@@ -1,1 +1,1 @@
-../../../../abis/linux/time.h
+../../../../abis/yolk/time.h

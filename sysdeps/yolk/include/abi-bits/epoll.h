@@ -1,1 +1,1 @@
-../../../../abis/linux/epoll.h
+../../../../abis/yolk/epoll.h

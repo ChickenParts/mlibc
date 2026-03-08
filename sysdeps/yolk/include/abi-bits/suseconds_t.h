@@ -1,1 +1,1 @@
-../../../../abis/linux/suseconds_t.h
+../../../../abis/yolk/suseconds_t.h

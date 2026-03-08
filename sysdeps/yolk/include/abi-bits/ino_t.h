@@ -1,1 +1,1 @@
-../../../../abis/linux/ino_t.h
+../../../../abis/yolk/ino_t.h

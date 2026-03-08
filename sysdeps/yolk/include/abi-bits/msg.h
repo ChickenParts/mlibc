@@ -1,1 +1,1 @@
-../../../../abis/linux/msg.h
+../../../../abis/yolk/msg.h
