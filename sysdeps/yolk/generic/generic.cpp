@@ -752,6 +752,44 @@ int sys_fstatvfs(int fd, struct statvfs *out) {
     return 0;
 }
 
+} // namespace mlibc
+
+extern "C" int statfs(const char *path, struct statfs *buf) {
+	if (!path || !buf) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	long result = __syscall2(SYS_statfs, (long)path, (long)buf);
+	if (result < 0) {
+		errno = -result;
+		return -1;
+	}
+	return 0;
+}
+
+extern "C" int fstatfs(int fd, struct statfs *buf) {
+	if (!buf) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	long result = __syscall2(SYS_fstatfs_core, fd, (long)buf);
+	if (result < 0) {
+		errno = -result;
+		return -1;
+	}
+	return 0;
+}
+
+#if defined(_LARGEFILE64_SOURCE)
+extern "C" int fstatfs64(int fd, struct statfs64 *buf) {
+	return fstatfs(fd, reinterpret_cast<struct statfs *>(buf));
+}
+#endif
+
+namespace mlibc {
+
 int sys_ftruncate(int fd, size_t size) {
     long result = __syscall2(SYS_ftruncate, fd, size);
     return result < 0 ? -result : 0;
