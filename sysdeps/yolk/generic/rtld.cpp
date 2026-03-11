@@ -85,6 +85,11 @@ int sys_vm_unmap(void *pointer, size_t size) {
 	return (result < 0) ? sc_errno(result) : 0;
 }
 
+int sys_vm_protect(void *pointer, size_t size, int prot) {
+	long result = __syscall3(SYS_mprotect, (long)pointer, size, prot);
+	return (result < 0) ? sc_errno(result) : 0;
+}
+
 int sys_open(const char *path, int flags, mode_t mode, int *fd) {
 	long result = __syscall4(SYS_open_core, (long)path, flags, mode, AT_FDCWD);
 	if (result < 0) {

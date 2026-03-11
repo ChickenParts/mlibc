@@ -64,7 +64,9 @@ DebugInterface globalDebugInterface;
 
 // Use a PC-relative instruction sequence to find our runtime load address.
 uintptr_t getLdsoBase() {
-#if defined(__x86_64__) || defined(__i386__) || defined(__aarch64__) || defined(__m68k__) || defined(__loongarch64)
+#if defined(__yolk__)
+	return reinterpret_cast<uintptr_t>(&__ehdr_start);
+#elif defined(__x86_64__) || defined(__i386__) || defined(__aarch64__) || defined(__m68k__) || defined(__loongarch64)
 	// On x86_64, the first GOT entry holds the link-time address of _DYNAMIC.
 	// TODO: This isn't guaranteed on AArch64, so this might fail with some linkers.
 	auto linktime_dynamic = reinterpret_cast<uintptr_t>(_GLOBAL_OFFSET_TABLE_[0]);
@@ -76,6 +78,19 @@ uintptr_t getLdsoBase() {
 	#error Unknown architecture!
 #endif
 }
+
+#if defined(__yolk__)
+elf_dyn *getLdsoDynamic(uintptr_t ldso_base) {
+	auto ldso_ehdr = reinterpret_cast<elf_ehdr *>(__ehdr_start);
+	auto phdr = reinterpret_cast<elf_phdr *>(ldso_base + ldso_ehdr->e_phoff);
+	for(size_t i = 0; i < ldso_ehdr->e_phnum; i++) {
+		if(phdr[i].p_type == PT_DYNAMIC) {
+			return reinterpret_cast<elf_dyn *>(ldso_base + phdr[i].p_vaddr);
+		}
+	}
+	__builtin_trap();
+}
+#endif
 
 #if !defined(__m68k__)
 // Relocates the dynamic linker (i.e. this DSO) itself.
@@ -90,8 +105,15 @@ extern "C" void relocateSelf() {
 	size_t rel_size = 0;
 	size_t relr_offset = 0;
 	size_t relr_size = 0;
-	for(size_t i = 0; _DYNAMIC[i].d_tag != DT_NULL; i++) {
-		auto ent = &_DYNAMIC[i];
+	auto ldso_base = getLdsoBase();
+#if defined(__yolk__)
+	auto self_dynamic = getLdsoDynamic(ldso_base);
+#else
+	auto self_dynamic = _DYNAMIC;
+#endif
+
+	for(size_t i = 0; self_dynamic[i].d_tag != DT_NULL; i++) {
+		auto ent = &self_dynamic[i];
 		switch(ent->d_tag) {
 		case DT_REL: rel_offset = ent->d_un.d_ptr; break;
 		case DT_RELSZ: rel_size = ent->d_un.d_val; break;
@@ -101,8 +123,6 @@ extern "C" void relocateSelf() {
 		case DT_RELRSZ: relr_size = ent->d_un.d_val; break;
 		}
 	}
-
-	auto ldso_base = getLdsoBase();
 
 	for(size_t disp = 0; disp < rela_size; disp += sizeof(elf_rela)) {
 		auto reloc = reinterpret_cast<elf_rela *>(ldso_base + rela_offset + disp);
@@ -313,10 +333,16 @@ extern "C" void *interpreterMain(uintptr_t *entry_stack) {
 	size_t num_ldso_ctors = 0;
 
 	auto ldso_base = getLdsoBase();
+	elf_dyn *self_dynamic = nullptr;
+#if defined(__yolk__)
+	self_dynamic = getLdsoDynamic(ldso_base);
+#else
+	self_dynamic = _DYNAMIC;
+#endif
 	if(logStartup) {
 		mlibc::infoLogger() << "ldso: Own base address is: 0x"
 				<< frg::hex_fmt(ldso_base) << frg::endlog;
-		mlibc::infoLogger() << "ldso: Own dynamic section is at: " << _DYNAMIC << frg::endlog;
+		mlibc::infoLogger() << "ldso: Own dynamic section is at: " << self_dynamic << frg::endlog;
 	}
 
 #ifdef __x86_64__
@@ -330,8 +356,8 @@ extern "C" void *interpreterMain(uintptr_t *entry_stack) {
 	// Here, we make sure that the dynamic linker does not need relocations itself.
 	uintptr_t strtab_offset = 0;
 	uintptr_t soname_str = 0;
-	for(size_t i = 0; _DYNAMIC[i].d_tag != DT_NULL; i++) {
-		auto ent = &_DYNAMIC[i];
+	for(size_t i = 0; self_dynamic[i].d_tag != DT_NULL; i++) {
+		auto ent = &self_dynamic[i];
 		switch(ent->d_tag) {
 		case DT_STRTAB: strtab_offset = ent->d_un.d_ptr; break;
 		case DT_SONAME: soname_str = ent->d_un.d_val; break;
@@ -536,7 +562,7 @@ extern "C" void *interpreterMain(uintptr_t *entry_stack) {
 	auto ldso_soname = reinterpret_cast<const char *>(ldso_base + strtab_offset + soname_str);
 	auto ldso = initialRepository->injectObjectFromDts(ldso_soname,
 		frg::string<MemoryAllocator> { getAllocator() },
-		ldso_base, _DYNAMIC, 1);
+		ldso_base, self_dynamic, 1);
 
 	auto ldso_ehdr = reinterpret_cast<elf_ehdr *>(__ehdr_start);
 	auto ldso_phdr = reinterpret_cast<elf_phdr *>(ldso_base + ldso_ehdr->e_phoff);
