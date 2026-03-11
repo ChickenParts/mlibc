@@ -13,8 +13,13 @@ if host_machine.cpu_family() == 'x86_64'
 	rtld_dso_sources += files('x86_64/rtld-syms.S')
 endif
 
+rtld_sources += files(
+	'generic/rtld.cpp',
+)
+
 libc_sources += files(
 	'generic/entry.cpp',
+	'generic/compiler-builtins.c',
 	'generic/generic.cpp',
 	'generic/thread.cpp',
 )
