@@ -48,9 +48,6 @@ namespace {
 		return list.get();
 	};
 
-	// Limit noisy stream-position diagnostics in interactive workloads.
-	int g_save_pos_seek_recover_budget = 16;
-	int g_save_pos_seek_error_budget = 16;
 } // namespace
 
 // For pipe-like streams (seek returns ESPIPE), we need to make sure
@@ -400,21 +397,11 @@ int abstract_file::_save_pos() {
 			// logical stream position directly.
 			e = io_seek(off_t(__offset), SEEK_SET, &new_offset);
 			if (!e) {
-				if (g_save_pos_seek_recover_budget > 0) {
-					--g_save_pos_seek_recover_budget;
-					mlibc::infoLogger() << "mlibc: recovered _save_pos seek with SEEK_SET"
-						<< frg::endlog;
-				}
 				return 0;
 			}
 		}
 		if (e) {
 			__status_bits |= __MLIBC_ERROR_BIT;
-			if (g_save_pos_seek_error_budget > 0) {
-				--g_save_pos_seek_error_budget;
-				mlibc::infoLogger() << "mlibc: _save_pos io_seek failed: " << e
-					<< frg::endlog;
-			}
 			return e;
 		}
 		return 0;
