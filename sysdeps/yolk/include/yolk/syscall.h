@@ -141,6 +141,7 @@
 #define SYS_truncate        76
 #define SYS_ftruncate       77
 #define SYS_fsync           74
+#define SYS_msync_core      189
 #define SYS_utimes          235
 #define SYS_statfs          137
 #define SYS_fstatfs        SYS_fstatfs_core
