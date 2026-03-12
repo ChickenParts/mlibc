@@ -23,6 +23,7 @@ libc_sources += files(
 	'generic/sysdeps.cpp',
 	'generic/mount.cpp',
 	'generic/thread.cpp',
+	'generic/sysinfo.cpp',
 )
 
 if not no_headers
