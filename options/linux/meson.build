@@ -2,7 +2,13 @@
 if not linux_option
 	subdir_done()
 endif
-libc_sources += files(
+
+# Ports that provide sysinfo() directly in their sysdep (avoiding
+# weak-symbol dispatch issues with static linking) list their system
+# name here so the generic weak-dispatch wrapper is skipped.
+_sysinfo_provided_by_sysdep = ['chickenos']
+
+_linux_sources = [
 	'generic/fcntl.cpp',
 	'generic/mntent.cpp',
 	'generic/sys-inotify.cpp',
@@ -18,7 +24,6 @@ libc_sources += files(
 	'generic/malloc.cpp',
 	'generic/sys-fsuid.cpp',
 	'generic/ifaddrs.cpp',
-	'generic/sys-sysinfo.cpp',
 	'generic/module.cpp',
 	'generic/sys-klog.cpp',
 	'generic/sched.cpp',
@@ -29,7 +34,13 @@ libc_sources += files(
 	'generic/sys-statfs.cpp',
 	'generic/sys-statx.cpp',
 	'generic/sys-pidfd.cpp',
-)
+]
+
+if not _sysinfo_provided_by_sysdep.contains(host_machine.system())
+	_linux_sources += 'generic/sys-sysinfo.cpp'
+endif
+
+libc_sources += files(_linux_sources)
 
 if not no_headers
 	install_headers(

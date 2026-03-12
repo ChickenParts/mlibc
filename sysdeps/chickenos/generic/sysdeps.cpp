@@ -13,6 +13,7 @@
 #include <chickenos/syscall.hpp>
 #include <sys/ioctl.h>
 #include <sys/statfs.h>
+#include <sys/sysinfo.h>
 #include <sched.h>
 
 #define STUB_ONLY { \
@@ -1497,9 +1498,24 @@ int sys_sysconf(int num, long *ret) {
 		case _SC_NPROCESSORS_CONF:
 			*ret = 1;
 			return 0;
-		case _SC_PHYS_PAGES:
-			*ret = 1024 * 1024; /* ~4 GB at 4K pages */
+		case _SC_PHYS_PAGES: {
+			struct sysinfo info{};
+			if(::sysinfo(&info) == 0) {
+				*ret = info.totalram * info.mem_unit / 4096;
+				return 0;
+			}
+			*ret = 1024 * 1024; /* fallback ~4 GB at 4K pages */
 			return 0;
+		}
+		case _SC_AVPHYS_PAGES: {
+			struct sysinfo info{};
+			if(::sysinfo(&info) == 0) {
+				*ret = info.freeram * info.mem_unit / 4096;
+				return 0;
+			}
+			*ret = 1024 * 1024;
+			return 0;
+		}
 		case _SC_CHILD_MAX:
 			*ret = 256;
 			return 0;
@@ -1514,6 +1530,9 @@ int sys_sysconf(int num, long *ret) {
 			return 0;
 		case _SC_NGROUPS_MAX:
 			*ret = 32;
+			return 0;
+		case _SC_TZNAME_MAX:
+			*ret = 6; /* POSIX minimum */
 			return 0;
 		default:
 			mlibc::infoLogger() << "mlibc: sys_sysconf unhandled num=" << num << frg::endlog;
