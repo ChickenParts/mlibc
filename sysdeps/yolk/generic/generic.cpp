@@ -846,7 +846,8 @@ int sys_tcsetattr(int fd, int optional_action, const struct termios *attr) {
 }
 
 int sys_tcflush(int fd, int queue) {
-    long result = __syscall3(SYS_ioctl, fd, TCFLSH, queue);
+    int queue_arg = queue;
+    long result = __syscall3(SYS_ioctl, fd, TCFLSH, (long)&queue_arg);
     return result < 0 ? -result : 0;
 }
 
