@@ -277,6 +277,7 @@ elif host_machine.system() == 'nyaux'
 elif host_machine.system() == 'yolk'
 	rtld_include_dirs += include_directories('sysdeps/yolk/include')
 	libc_include_dirs += include_directories('sysdeps/yolk/include')
+	internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
 	subdir('sysdeps/yolk')
 # ANCHOR: demo-sysdeps
 elif host_machine.system() == 'demo'
