@@ -2909,9 +2909,10 @@ int sys_mlockall(int flags) {
 }
 
 int sys_msync(void *addr, size_t length, int flags) {
-    (void)addr;
-    (void)length;
-    (void)flags;
+    long ret = __syscall3(SYS_msync_core, (long)addr, length, flags);
+    if (ret < 0) {
+        return -ret;
+    }
     return 0;
 }
 
