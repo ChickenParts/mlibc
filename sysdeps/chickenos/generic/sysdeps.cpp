@@ -115,12 +115,12 @@ int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags,
 		struct stat *statbuf) {
 	sc_result_t ret;
 	if(fsfdt == fsfd_target::path) {
-		ret = do_syscall(SYS_stat, path, statbuf);
+		ret = do_syscall(SYS_stat64, path, statbuf);
 	} else if(fsfdt == fsfd_target::fd) {
-		ret = do_syscall(SYS_fstat, fd, statbuf);
+		ret = do_syscall(SYS_fstat64, fd, statbuf);
 	} else {
 		__ensure(fsfdt == fsfd_target::fd_path);
-		ret = do_syscall(SYS_fstat, fd, statbuf);
+		ret = do_syscall(SYS_fstat64, fd, statbuf);
 	}
 	if(int e = sc_error(ret); e)
 		return e;
@@ -224,7 +224,7 @@ int sys_dup2(int fd, int flags, int newfd) {
 
 int sys_fcntl(int fd, int cmd, va_list args, int *result) {
 	auto arg = va_arg(args, unsigned long);
-	auto ret = do_syscall(SYS_fcntl, fd, cmd, arg);
+	auto ret = do_syscall(SYS_fcntl64, fd, cmd, arg);
 	if(int e = sc_error(ret); e)
 		return e;
 	*result = sc_int_result<int>(ret);
