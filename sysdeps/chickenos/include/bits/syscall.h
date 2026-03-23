@@ -21,8 +21,8 @@
 #define SYS_writev          0x0B
 #define SYS_access          0x0C
 #define SYS_dup             0x0D
-#define SYS_dup2            0x0E
-#define SYS_dup3            0x0F
+#define SYS_dup2            0x0E  /* unified: takes flags */
+#define SYS_dup3            0x0E  /* → dup2 */
 #define SYS_fcntl64         0x410
 #define SYS_ioctl           0x11
 #define SYS_flock           0x12
@@ -32,15 +32,15 @@
 #define SYS_ftruncate       0x16
 
 /* 0x040-0x07F: Pipes & FD Types */
-#define SYS_pipe            0x40
-#define SYS_pipe2           0x41
-#define SYS_eventfd         0x42
-#define SYS_eventfd2        0x43
+#define SYS_pipe            0x40  /* unified: takes flags */
+#define SYS_pipe2           0x40  /* → pipe */
+#define SYS_eventfd         0x43
+#define SYS_eventfd2        0x43  /* → eventfd */
 #define SYS_timerfd_create  0x44
 #define SYS_timerfd_settime 0x45
 #define SYS_timerfd_gettime 0x46
-#define SYS_signalfd        0x47
-#define SYS_signalfd4       0x48
+#define SYS_signalfd        0x47  /* unified: takes flags */
+#define SYS_signalfd4       0x47  /* → signalfd */
 #define SYS_memfd_create    0x49
 
 /* 0x080-0x0BF: Directory & Path Operations */
@@ -71,8 +71,11 @@
 #define SYS_readlinkat      0xA6
 #define SYS_fchmodat        0xA7
 #define SYS_fchownat        0xA8
-#define SYS_faccessat       0xA9
-#define SYS_renameat2       0xAA
+#define SYS_faccessat       0xA9  /* unified: takes flags */
+#define SYS_faccessat2      0xA9  /* → faccessat */
+#define SYS_renameat2       0xA3  /* → renameat */
+#define SYS_fchmodat2       0xA7  /* → fchmodat */
+#define SYS_openat2         0xA0  /* → openat */
 
 /* 0x0C0-0x0FF: Memory Management */
 #define SYS_mmap            0xC0
@@ -127,23 +130,24 @@
 #define SYS_pause           0x161
 
 /* 0x180-0x1BF: I/O Multiplexing */
-#define SYS_poll            0x180
+#define SYS_poll            0x181  /* → ppoll */
 #define SYS_ppoll           0x181
-#define SYS_select          0x182
+#define SYS_select          0x183  /* → pselect6 */
 #define SYS_pselect6        0x183
-#define SYS_epoll_create    0x184
-#define SYS_epoll_create1   0x185
+#define SYS_epoll_create    0x184  /* unified: takes flags */
+#define SYS_epoll_create1   0x184  /* → epoll_create */
 #define SYS_epoll_ctl       0x186
-#define SYS_epoll_wait      0x187
-#define SYS_epoll_pwait     0x188
+#define SYS_epoll_wait      0x187  /* unified: sigmask + timespec */
+#define SYS_epoll_pwait     0x187  /* → epoll_wait */
+#define SYS_epoll_pwait2    0x187  /* → epoll_wait */
 
 /* 0x1C0-0x1FF: Sockets */
 #define SYS_socket          0x1C0
 #define SYS_socketpair      0x1C1
 #define SYS_bind            0x1C2
 #define SYS_listen          0x1C3
-#define SYS_accept          0x1C4
-#define SYS_accept4         0x1C5
+#define SYS_accept          0x1C4  /* unified: takes flags */
+#define SYS_accept4         0x1C4  /* → accept */
 #define SYS_connect         0x1C6
 #define SYS_sendto          0x1C7
 #define SYS_recvfrom        0x1C8
@@ -206,6 +210,96 @@
 #define SYS_set_thread_area 0x301
 #define SYS_get_thread_area 0x302
 #define SYS_set_tid_address 0x303
+
+/* 0x190-0x19F: File Notification */
+#define SYS_inotify_init    0x193  /* unified: takes flags */
+#define SYS_inotify_init1   0x193  /* → inotify_init */
+#define SYS_inotify_add_watch 0x195
+#define SYS_inotify_rm_watch 0x196
+
+/* Additional process control */
+#define SYS_clone3          0x108
+#define SYS_prctl           0x111
+#define SYS_execveat        0x11B
+#define SYS_getresuid       0x126
+#define SYS_setresuid       0x127
+#define SYS_getresgid       0x128
+#define SYS_setresgid       0x129
+#define SYS_setreuid        0x12A
+#define SYS_setregid        0x12B
+#define SYS_setfsuid        0x12C
+#define SYS_setfsgid        0x12D
+#define SYS_getcpu          0x130
+#define SYS_personality     0x131
+#define SYS_close_range     0x4A
+#define SYS_pidfd_open      0x14D
+#define SYS_pidfd_send_signal 0x14E
+#define SYS_pidfd_getfd     0x14F
+
+/* Additional time */
+#define SYS_time            0x210
+#define SYS_clock_adjtime   0x20E
+
+/* Additional scheduler */
+#define SYS_sched_getaffinity  0x24C
+#define SYS_sched_setaffinity  0x24D
+#define SYS_sched_getparam  0x24E
+#define SYS_sched_setparam  0x24F
+#define SYS_sched_getscheduler 0x250
+#define SYS_sched_setscheduler 0x251
+#define SYS_sched_get_priority_max 0x252
+#define SYS_sched_get_priority_min 0x253
+#define SYS_rseq            0x257
+#define SYS_set_robust_list 0x264
+#define SYS_get_robust_list 0x265
+#define SYS_membarrier      0x258
+
+/* Additional memory */
+#define SYS_mincore         0xCC
+#define SYS_mlock2          0xCB
+
+/* Additional filesystem */
+#define SYS_chroot          0x286
+#define SYS_syslog          0x287
+#define SYS_fadvise64       0x418
+#define SYS_readahead       0x19
+#define SYS_fallocate       0x1A
+#define SYS_sendfile        0x17
+#define SYS_copy_file_range 0x1B
+#define SYS_splice          0x21
+#define SYS_tee             0x22
+#define SYS_vmsplice        0x23
+#define SYS_sync_file_range 0x24
+#define SYS_preadv          0x1D
+#define SYS_pwritev         0x1E
+#define SYS_preadv2         0x1D  /* → preadv */
+#define SYS_pwritev2        0x1E  /* → pwritev */
+#define SYS_creat           0x1C
+#define SYS_mknod           0x91
+#define SYS_mknodat         0x92
+#define SYS_utimensat       0x94
+#define SYS_statx           0x96
+#define SYS_newfstatat      0x495
+#define SYS_getdents        0x85
+
+/* Extended Attributes */
+#define SYS_setxattr        0x320
+#define SYS_getxattr        0x321
+#define SYS_listxattr       0x322
+#define SYS_removexattr     0x323
+#define SYS_fsetxattr       0x324
+#define SYS_fgetxattr       0x325
+#define SYS_flistxattr      0x326
+#define SYS_fremovexattr    0x327
+#define SYS_lsetxattr       0x328
+#define SYS_lgetxattr       0x329
+#define SYS_llistxattr      0x32A
+#define SYS_lremovexattr    0x32B
+
+/* Terminal extras */
+#define SYS_vhangup         0x2C5
+#define SYS_sethostname     0x2C6
+#define SYS_setdomainname   0x2C7
 
 /* 0x380-0x3BF: Debug & Introspection */
 #define SYS_ptrace          0x380
