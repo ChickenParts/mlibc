@@ -129,7 +129,7 @@
 #define SYS_pause           0x161
 
 /* 0x180-0x1BF: I/O Multiplexing */
-#define SYS_poll            0x181  /* → ppoll */
+#define SYS_poll            0x180
 #define SYS_ppoll           0x181
 #define SYS_select          0x183  /* → pselect6 */
 #define SYS_pselect6        0x183
