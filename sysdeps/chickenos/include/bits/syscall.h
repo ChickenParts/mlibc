@@ -32,8 +32,7 @@
 #define SYS_ftruncate       0x16
 
 /* 0x040-0x07F: Pipes & FD Types */
-#define SYS_pipe            0x40  /* unified: takes flags */
-#define SYS_pipe2           0x40  /* → pipe */
+#define SYS_pipe            0x40
 #define SYS_eventfd         0x43
 #define SYS_eventfd2        0x43  /* → eventfd */
 #define SYS_timerfd_create  0x44

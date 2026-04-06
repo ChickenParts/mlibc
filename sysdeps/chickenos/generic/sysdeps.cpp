@@ -215,8 +215,7 @@ int sys_dup(int fd, int flags, int *newfd) {
 }
 
 int sys_dup2(int fd, int flags, int newfd) {
-	(void)flags;
-	auto ret = do_syscall(SYS_dup2, fd, newfd);
+	auto ret = do_syscall(SYS_dup2, fd, newfd, flags);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
@@ -289,15 +288,9 @@ int sys_faccessat(int dirfd, const char *pathname, int mode, int flags) {
 }
 
 int sys_pipe(int *fds, int flags) {
-	if(flags) {
-		auto ret = do_syscall(SYS_pipe2, fds, flags);
-		if(int e = sc_error(ret); e)
-			return e;
-	} else {
-		auto ret = do_syscall(SYS_pipe, fds);
-		if(int e = sc_error(ret); e)
-			return e;
-	}
+	auto ret = do_syscall(SYS_pipe, fds, flags);
+	if(int e = sc_error(ret); e)
+		return e;
 	return 0;
 }
 
