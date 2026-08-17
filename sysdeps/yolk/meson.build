@@ -21,14 +21,21 @@ libc_sources += files(
 	'generic/entry.cpp',
 	'generic/generic.cpp',
 	'generic/thread.cpp',
+	'generic/tcb_abi.cpp',
 )
 
-# Architecture-specific thread entry and signal restorer
+# Architecture-specific thread entry and signal restorer.
 if host_machine.cpu_family() == 'x86_64'
 	libc_sources += files(
 		'x86_64/thread_entry.S',
 		'x86_64/signals.S',
 	)
+elif host_machine.cpu_family() == 'aarch64'
+	libc_sources += files('aarch64/thread_entry.S')
+elif host_machine.cpu_family() == 'riscv64'
+	libc_sources += files('riscv64/thread_entry.S')
+else
+	error('Unsupported Yolk mlibc architecture: ' + host_machine.cpu_family())
 endif
 
 yolk_include_dirs = include_directories('include')
@@ -38,6 +45,7 @@ libc_include_dirs += yolk_include_dirs
 if not no_headers
 	install_headers(
 		'include/yolk/syscall.h',
+		'include/yolk/tcb-abi.h',
 		subdir: 'yolk',
 		follow_symlinks: true
 	)

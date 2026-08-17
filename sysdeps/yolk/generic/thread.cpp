@@ -35,9 +35,10 @@ static constexpr size_t default_stacksize = 0x200000;
  * Thread entry point.
  * Called by the new thread after clone returns.
  * The stack was set up by sys_prepare_stack with:
- *   [stack+0] = entry function
- *   [stack+8] = user argument
- *   [stack+16] = tcb pointer
+ *   [stack+0]  = fake return address
+ *   [stack+8]  = entry function
+ *   [stack+16] = user argument
+ *   [stack+24] = final ABI thread pointer
  */
 extern "C" void __mlibc_thread_entry();
 
@@ -106,19 +107,41 @@ int sys_clone(void *tcb, pid_t *tid_out, void *stack) {
         : "rcx", "r11", "memory", "cc"
     );
 #elif defined(__aarch64__)
-    /* TODO: aarch64 implementation */
-    result = __syscall5(SYS_clone, flags, (long)stack,
-                        0, (long)tid_out, (long)tcb);
-    if (result == 0) {
-        __mlibc_thread_entry();
-    }
-#elif defined(__riscv)
-    /* TODO: riscv implementation */
-    result = __syscall5(SYS_clone, flags, (long)stack,
-                        0, (long)tid_out, (long)tcb);
-    if (result == 0) {
-        __mlibc_thread_entry();
-    }
+    register unsigned long x0 __asm__("x0") = flags;
+    register unsigned long x1 __asm__("x1") = (unsigned long)stack;
+    register unsigned long x2 __asm__("x2") = (unsigned long)tid_out;
+    register unsigned long x3 __asm__("x3") = (unsigned long)tid_out;
+    register unsigned long x4 __asm__("x4") = (unsigned long)tcb;
+    register unsigned long x8 __asm__("x8") = (unsigned long)SYS_clone;
+
+    __asm__ volatile(
+        "svc #0\n\t"
+        "cbnz x0, 1f\n\t"
+        "b __mlibc_thread_entry\n\t"
+        "1:\n\t"
+        : "+r"(x0)
+        : "r"(x1), "r"(x2), "r"(x3), "r"(x4), "r"(x8)
+        : "memory", "cc"
+    );
+    result = (long)x0;
+#elif defined(__riscv) && __riscv_xlen == 64
+    register unsigned long a0 __asm__("a0") = flags;
+    register unsigned long a1 __asm__("a1") = (unsigned long)stack;
+    register unsigned long a2 __asm__("a2") = (unsigned long)tid_out;
+    register unsigned long a3 __asm__("a3") = (unsigned long)tid_out;
+    register unsigned long a4 __asm__("a4") = (unsigned long)tcb;
+    register unsigned long a7 __asm__("a7") = (unsigned long)SYS_clone;
+
+    __asm__ volatile(
+        "ecall\n\t"
+        "bnez a0, 1f\n\t"
+        "tail __mlibc_thread_entry\n\t"
+        "1:\n\t"
+        : "+r"(a0)
+        : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a7)
+        : "t1", "memory"
+    );
+    result = (long)a0;
 #else
 #error "Unsupported architecture"
 #endif
@@ -185,7 +208,7 @@ int sys_prepare_stack(
      */
     uintptr_t sp = (uintptr_t)*stack_base + *stack_size;
 
-    /* Align stack to 16 bytes (required by x86_64 ABI) */
+    /* All maintained 64-bit ABIs require at least 16-byte alignment. */
     sp &= ~(uintptr_t)0xF;
 
     /* Push values onto stack (in reverse order) */

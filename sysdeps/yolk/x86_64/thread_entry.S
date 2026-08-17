@@ -7,7 +7,7 @@
  *   [rsp+0]  = fake return address (null)
  *   [rsp+8]  = entry function pointer
  *   [rsp+16] = user argument
- *   [rsp+24] = tcb pointer (for TLS)
+ *   [rsp+24] = final ABI thread pointer
  */
 
 .section .text
@@ -15,46 +15,25 @@
 .type __mlibc_thread_entry, @function
 
 __mlibc_thread_entry:
-    /*
-     * New thread entry point.
-     * Stack layout:
-     *   rsp+0:  null (fake return address)
-     *   rsp+8:  entry function
-     *   rsp+16: user_arg
-     *   rsp+24: tcb
-     */
-
-    /* Skip fake return address */
+    /* Skip the synthetic return slot and consume the prepared frame. */
     add $8, %rsp
-
-    /* Pop entry function into r12 (callee-saved) */
     pop %r12
-
-    /* Pop user_arg into r13 (callee-saved) */
     pop %r13
-
-    /* Pop tcb into r14 (callee-saved) */
     pop %r14
 
-    /* Set up TLS: write tcb to FS base */
-    mov %r14, %rdi
-    wrfsbase %rdi
+    /* The kernel already publishes the child FS base from CLONE_SETTLS. Keep
+     * the explicit write for standalone compatibility and as an ABI check. */
+    wrfsbase %r14
 
-    /* Align stack to 16 bytes before call */
+    /* sys_prepare_stack() leaves the post-frame stack 16-byte aligned, which
+     * is the SysV caller-side alignment required immediately before call. */
     and $-16, %rsp
-    sub $8, %rsp
-
-    /* Call entry function: entry(user_arg) */
     mov %r13, %rdi
     call *%r12
 
-    /* Entry function returned - exit thread */
-    /* sys_thread_exit() */
-    mov $2, %rax        /* SYS_exit */
-    xor %edi, %edi      /* status = 0 */
+    mov $2, %rax
+    xor %edi, %edi
     syscall
-
-    /* Should never reach here */
     ud2
 
 .size __mlibc_thread_entry, . - __mlibc_thread_entry
