@@ -27,6 +27,7 @@ libc_sources += files(
 	'generic/entry.cpp',
 	'generic/generic.cpp',
 	'generic/thread.cpp',
+	'generic/tcb_contract.cpp',
 )
 
 # Architecture-specific thread entry and signal restorer
