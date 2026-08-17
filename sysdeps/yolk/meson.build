@@ -29,6 +29,7 @@ libc_sources += files(
 	'generic/entry.cpp',
 	'generic/generic.cpp',
 	'generic/tcb.cpp',
+	'generic/tcb_contract.cpp',
 	'generic/recovery.cpp',
 	'generic/thread_recovery.cpp',
 	host_machine.cpu_family() / 'thread_entry.S',

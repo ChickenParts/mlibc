@@ -26,8 +26,13 @@ Recovery hardening adds:
 - `msync` support;
 - real directory seek/tell state and bounded `readdir` parsing;
 - clone trampolines, thread entry, TLS setup, and signal-restorer assembly on
-  all three maintained architectures.
+  all three maintained architectures;
+- compile-time `Tcb` size assertions: 144 bytes on x86-64 and 136 bytes on
+  AArch64/RISC-V 64.
 
-This branch is intentionally immutable once referenced by a Yolk lock file.
-Further port work should use a descendant branch and update the superproject
-lock and gitlink together.
+The stale recovered `generic/thread.cpp` implementation is intentionally absent;
+`generic/thread_recovery.cpp` is the only compiled thread sysdep.
+
+This branch is immutable once referenced by a Yolk lock file. Further port work
+must use a descendant branch and update the superproject lock and gitlink
+together.
