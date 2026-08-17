@@ -320,6 +320,13 @@ elif host_machine.system() == 'ethereal'
 	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', false)
 	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
 	subdir('sysdeps/ethereal')
+elif host_machine.system() == 'yolk'
+	rtld_include_dirs += include_directories('sysdeps/yolk/include')
+	libc_include_dirs += include_directories('sysdeps/yolk/include')
+	internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
+	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', true)
+	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
+	subdir('sysdeps/yolk')
 # ANCHOR: demo-sysdeps
 elif host_machine.system() == 'demo'
 	subdir('sysdeps/demo')
@@ -489,8 +496,6 @@ internal_sources = [
 	'options/internal/generic/ubsan.cpp',
 	'options/internal/generic/threads.cpp',
 	'options/internal/generic/search.cpp',
-	'options/internal/generic/stdlib.cpp',
-	'options/internal/generic/wide.cpp',
 	'options/internal/gcc/stack_protector.cpp',
 	'options/internal/gcc/guard-abi.cpp',
 	'options/internal/gcc-extra/cxxabi.cpp',
