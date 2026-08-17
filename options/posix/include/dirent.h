@@ -26,8 +26,6 @@ extern "C" {
 #define DT_SOCK 12
 #define DT_WHT 14
 
-/* The character array d_name is of unspecified size, but the number of bytes preceding
- * the terminating null byte will not exceed {NAME_MAX}. */
 #define __MLIBC_DIRENT_BODY ino_t d_ino; \
 			off_t d_off; \
 			reclen_t d_reclen; \
@@ -52,6 +50,7 @@ struct __mlibc_dir_struct {
 	int __handle;
 	__mlibc_size __ent_next;
 	__mlibc_size __ent_limit;
+	off_t __seek_offset;
 	char __ent_buffer[2048];
 	struct dirent __current;
 };
@@ -66,9 +65,11 @@ int dirfd(DIR *__dirp);
 DIR *fdopendir(int __fd);
 DIR *opendir(const char *__pathname);
 struct dirent *readdir(DIR *__dirp);
-int readdir_r(DIR *__restrict __dirp, struct dirent *__restrict __entry, struct dirent **__restrict __res);
+int readdir_r(DIR *__restrict __dirp, struct dirent *__restrict __entry,
+		struct dirent **__restrict __res);
 void rewinddir(DIR *__dirp);
-int scandir(const char *__pathname, struct dirent ***__res, int (*__select)(const struct dirent *__entry),
+int scandir(const char *__pathname, struct dirent ***__res,
+		int (*__select)(const struct dirent *__entry),
 		int (*__compare)(const struct dirent **__a, const struct dirent **__b));
 ssize_t posix_getdents(int __fildes, void *__buf, size_t __nbyte, int __flags);
 
@@ -78,7 +79,7 @@ struct dirent64 {
 };
 
 struct dirent64 *readdir64(DIR *__dirp);
-#endif /* __MLIBC_LINUX_OPTION && defined(_LARGEFILE64_SOURCE) */
+#endif
 
 #undef __MLIBC_DIRENT_BODY
 
@@ -89,13 +90,12 @@ long telldir(DIR *__dirp);
 
 #if __MLIBC_GLIBC_OPTION && defined(_GNU_SOURCE)
 int versionsort(const struct dirent **__a, const struct dirent **__b);
-#endif /* __MLIBC_GLIBC_OPTION && defined(_GNU_SOURCE) */
+#endif
 
-#endif /* !__MLIBC_ABI_ONLY */
+#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _DIRENT_H */
-
+#endif
