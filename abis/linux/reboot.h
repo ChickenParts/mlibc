@@ -1,11 +1,7 @@
 #ifndef _ABIBITS_REBOOT_H
 #define _ABIBITS_REBOOT_H
 
-#include <mlibc-config.h>
-
-#if !__MLIBC_LINUX_REBOOT_OPTION
-#  error "<sys/reboot.h> is tied to the linux-reboot option. Enable it or do not use this header."
-#endif /* !__MLIBC_LINUX_REBOOT_OPTION */
+/* Reboot commands for Linux software compatibility */
 
 #define RB_AUTOBOOT 0x01234567
 #define RB_HALT_SYSTEM 0xcdef0123

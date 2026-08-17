@@ -1,11 +1,7 @@
 #ifndef _ABIBITS_STATFS_H
 #define _ABIBITS_STATFS_H
 
-#include <mlibc-config.h>
-
-#if !__MLIBC_LINUX_OPTION
-#  error "statfs() is inherently Linux specific. Enable the Linux option or do not use this header."
-#endif /* !__MLIBC_LINUX_OPTION */
+/* statfs provided for Linux software compatibility */
 
 #include <abi-bits/fsblkcnt_t.h>
 #include <abi-bits/fsfilcnt_t.h>
@@ -47,4 +43,3 @@ struct statfs64 {
 };
 
 #endif /* _ABIBITS_STATFS_H */
-
