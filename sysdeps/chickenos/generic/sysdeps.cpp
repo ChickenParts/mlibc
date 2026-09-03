@@ -186,9 +186,15 @@ int sys_futex_wake(int *pointer, bool all) {
 int sys_clock_get(int clock, time_t *secs, long *nanos) {
 	struct timespec ts;
 
-	/* The vDSO answers what it can and returns -ENOSYS for the rest --
-	 * CLOCK_MONOTONIC among them, because its sub-tick interpolation uses
-	 * a per-CPU anchor userspace cannot hold.  Fall through on ENOSYS. */
+	/* CLOCK_MONOTONIC's sub-tick interpolation uses a per-CPU anchor
+	 * userspace cannot hold, so the vDSO cannot answer it from vvar --
+	 * but as of v0.4.6a's F9/R23 it no longer just refuses: it FORWARDS
+	 * CLOCK_MONOTONIC (and any id it does not recognise) to the real
+	 * syscall itself and returns exactly what the kernel returned, so
+	 * `rc` is essentially never -ENOSYS in practice. This fallthrough on
+	 * ENOSYS is still correct defence -- an unreadable vvar page still
+	 * returns it -- it just is not the vDSO's everyday refusal path that
+	 * an earlier version of this comment described. */
 	if (auto fn = vdso_clock_gettime()) {
 		struct timespec vts;
 		int rc = fn(clock, &vts);
