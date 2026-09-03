@@ -10,11 +10,25 @@
 #include <mlibc/allocator.hpp>
 #include <mlibc/debug.hpp>
 #include <mlibc/all-sysdeps.hpp>
+#include <mlibc/dlapi.hpp>
 #include <chickenos/syscall.hpp>
 #include <sys/ioctl.h>
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
 #include <sched.h>
+
+namespace {
+	/* Resolved once, lazily.  __dlapi_vdsosym lives in the rtld, so this
+	 * is nullptr in a statically linked program -- which is correct
+	 * behaviour, not a failure: the syscall path below still works. */
+	using vdso_clock_gettime_t = int (*)(int, struct timespec *);
+
+	vdso_clock_gettime_t vdso_clock_gettime() {
+		static vdso_clock_gettime_t fn = reinterpret_cast<vdso_clock_gettime_t>(
+			__dlapi_vdsosym("__vdso_clock_gettime", "CHICKEN_1.0"));
+		return fn;
+	}
+}
 
 #define STUB_ONLY { \
 	mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub" << frg::endlog; \
@@ -171,6 +185,21 @@ int sys_futex_wake(int *pointer, bool all) {
 
 int sys_clock_get(int clock, time_t *secs, long *nanos) {
 	struct timespec ts;
+
+	/* The vDSO answers what it can and returns -ENOSYS for the rest --
+	 * CLOCK_MONOTONIC among them, because its sub-tick interpolation uses
+	 * a per-CPU anchor userspace cannot hold.  Fall through on ENOSYS. */
+	if (auto fn = vdso_clock_gettime()) {
+		struct timespec vts;
+		int rc = fn(clock, &vts);
+		if (rc == 0) {
+			*secs = vts.tv_sec;
+			*nanos = vts.tv_nsec;
+			return 0;
+		}
+		if (rc != -ENOSYS) return -rc;
+	}
+
 	auto ret = do_syscall(SYS_clock_gettime, clock, &ts);
 	if(int e = sc_error(ret); e)
 		return e;
