@@ -80,14 +80,35 @@ int sys_tcb_set(void *pointer) {
 	if(int e = sc_error(ret); e)
 		return e;
 #elif defined(__aarch64__)
-	// aarch64: kernel sets TPIDR_EL0 via set_thread_area
-	auto ret = do_syscall(SYS_set_thread_area, pointer);
+	/* ⚠ + sizeof(Tcb) - 0x10, not the raw pointer.  sys_tcb_set is handed the
+	 * TCB address, but the thread pointer is defined relative to the TLS
+	 * blocks that FOLLOW it: aarch64-include/mlibc/thread.hpp recovers the TCB
+	 * as `tpidr_el0 + 0x10 - sizeof(Tcb)`, so handing the kernel the bare TCB
+	 * address makes get_current_tcb() compute an address sizeof(Tcb) - 0x10
+	 * short and fail its `__ensure(tcb == tcb->selfPointer)`.  Same adjustment
+	 * upstream's Linux port applies.
+	 *
+	 * ⚠ UNVERIFIED on hardware: aarch64 has no cross-built userland that has
+	 * run yet.  Fixed by inspection off the riscv64 measurement below, which
+	 * was the identical defect and did fail exactly this way. */
+	uintptr_t thread_data = reinterpret_cast<uintptr_t>(pointer) + sizeof(Tcb) - 0x10;
+	auto ret = do_syscall(SYS_set_thread_area, thread_data);
 	if(int e = sc_error(ret); e)
 		return e;
 #elif defined(__riscv)
-	// riscv64: use the tp register directly
-	uintptr_t v = reinterpret_cast<uintptr_t>(pointer);
-	asm volatile("mv tp, %0" :: "r"(v));
+	/* ⚠ + sizeof(Tcb).  riscv64-include/mlibc/thread.hpp recovers the TCB as
+	 * `tp - sizeof(Tcb)`, so setting tp to the bare TCB address puts every
+	 * lookup one Tcb too low.  Measured on ChickenOS/riscv64 -- dash reached
+	 * userspace, ran, and died on
+	 *
+	 *   In function get_current_tcb, .../riscv64-include/mlibc/thread.hpp:13
+	 *   __ensure(tcb == tcb->selfPointer) failed
+	 *   mlibc: PANIC!
+	 *
+	 * having logged it through a working write() syscall.  Matches upstream's
+	 * Linux riscv branch exactly. */
+	uintptr_t thread_data = reinterpret_cast<uintptr_t>(pointer) + sizeof(Tcb);
+	asm volatile("mv tp, %0" :: "r"(thread_data));
 #endif
 	return 0;
 }
