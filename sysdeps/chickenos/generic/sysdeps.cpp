@@ -18,9 +18,31 @@
 #include <sched.h>
 
 namespace {
-	/* Resolved once, lazily.  __dlapi_vdsosym lives in the rtld, so this
-	 * is nullptr in a statically linked program -- which is correct
-	 * behaviour, not a failure: the syscall path below still works. */
+	/* Resolved once, lazily.  __dlapi_vdsosym lives in the rtld, so a
+	 * statically linked program can never bind a vDSO symbol.
+	 *
+	 * ⚠ It is NOT enough to let it return nullptr, which is what an
+	 * earlier version of this comment claimed.  In a static link
+	 * __dlapi_vdsosym is not absent, it is an undefined REFERENCE, and
+	 * libc.a contains the rtld's objects (meson's libc_static
+	 * link_wholes ld_static_lib).  So lld satisfies it by extracting
+	 * options_rtld_generic_main.cpp.o, which drags in the rtld's own
+	 * copies of sysdeps.cpp, the allocator, frigg and six more objects
+	 * -- all of which the libc copies already define:
+	 *
+	 *   ld.lld: error: duplicate symbol: mlibc::sys_exit(int)
+	 *   >>> ... sysdeps_chickenos_generic_sysdeps.cpp.o in archive libc.a
+	 *   >>> ... sysdeps_chickenos_generic_sysdeps.cpp.o in archive libc.a
+	 *
+	 * and no static binary can link against the libc at all.  Confirmed
+	 * with --why-extract: the edge is
+	 *   sysdeps.cpp.o -> options_rtld_generic_main.cpp.o  __dlapi_vdsosym
+	 *
+	 * MLIBC_STATIC_BUILD is defined for libc_static and ld_static_lib
+	 * only (meson.build's static_cpp_args), so the shared build keeps the
+	 * vDSO fast path -- which is the only build that could ever use it.
+	 */
+#ifndef MLIBC_STATIC_BUILD
 	using vdso_clock_gettime_t = int (*)(int, struct timespec *);
 
 	vdso_clock_gettime_t vdso_clock_gettime() {
@@ -28,6 +50,7 @@ namespace {
 			__dlapi_vdsosym("__vdso_clock_gettime", "CHICKEN_1.0"));
 		return fn;
 	}
+#endif
 }
 
 #define STUB_ONLY { \
@@ -195,6 +218,7 @@ int sys_clock_get(int clock, time_t *secs, long *nanos) {
 	 * ENOSYS is still correct defence -- an unreadable vvar page still
 	 * returns it -- it just is not the vDSO's everyday refusal path that
 	 * an earlier version of this comment described. */
+#ifndef MLIBC_STATIC_BUILD
 	if (auto fn = vdso_clock_gettime()) {
 		struct timespec vts;
 		int rc = fn(clock, &vts);
@@ -205,6 +229,7 @@ int sys_clock_get(int clock, time_t *secs, long *nanos) {
 		}
 		if (rc != -ENOSYS) return -rc;
 	}
+#endif
 
 	auto ret = do_syscall(SYS_clock_gettime, clock, &ts);
 	if(int e = sc_error(ret); e)
@@ -1513,13 +1538,35 @@ int sys_chroot(const char *path) {
 	return ENOSYS;
 }
 
-/* sysconf: return key compile-time constants.  Gated out of the rtld build
+/* ⚠ The `|| defined(MLIBC_STATIC_BUILD)` in the gates below is load-bearing,
+ * and the reason is archive-member selection.  meson's libc_static
+ * link_wholes ld_static_lib, so libc.a holds TWO builds of this file: the libc
+ * one and the rtld one.  A static program pulls the rtld's main.cpp in for
+ * __dlapi_enter (crt1 -> __mlibc_entry -> __dlapi_enter), so both copies are
+ * candidates for extraction.  While the two define the SAME symbols that is
+ * harmless -- the armap names one member per symbol and lld extracts only
+ * that one.  Gating functions out of the rtld build breaks the parity: a
+ * program calling sysconf() forces the libc copy while __dlapi_enter forces
+ * the rtld chain, lld extracts both, and every static link dies on
+ *
+ *   ld.lld: error: duplicate symbol: mlibc::sys_exit(int)
+ *   >>> ... sysdeps_chickenos_generic_sysdeps.cpp.o in archive libc.a
+ *   >>> ... sysdeps_chickenos_generic_sysdeps.cpp.o in archive libc.a
+ *
+ * 17 of them, on x86_64 and aarch64 alike -- toybox, busybox, dash and gawk
+ * all stopped linking.  The gates exist for the SHARED ld.so, which is linked
+ * standalone with -Wl,--no-undefined and really cannot carry these; the static
+ * rtld has the whole libc in the same archive and can.  So gate on the shared
+ * build only.
+ */
+
+/* sysconf: return key compile-time constants.  Gated out of the SHARED rtld
  * (ld.so, ld_static_lib): nothing in the rtld calls sys_sysconf, and the
  * _SC_PHYS_PAGES/_SC_AVPHYS_PAGES cases below pull in ::sysinfo(), which is
  * a libc_all_sources symbol (generic/sysinfo.cpp) never linked into ld.so --
  * left in, `-Wl,--no-undefined` fails ld.so's link over a function it never
  * calls. */
-#ifndef MLIBC_BUILDING_RTLD
+#if !defined(MLIBC_BUILDING_RTLD) || defined(MLIBC_STATIC_BUILD)
 int sys_sysconf(int num, long *ret) {
 	switch(num) {
 		case _SC_PAGE_SIZE:
@@ -1573,7 +1620,7 @@ int sys_sysconf(int num, long *ret) {
 			return EINVAL;
 	}
 }
-#endif // !MLIBC_BUILDING_RTLD
+#endif // !MLIBC_BUILDING_RTLD || MLIBC_STATIC_BUILD
 
 /* No kernel devctl implementation */
 int sys_posix_devctl(int fd, int dcmd, void *__restrict dev_data_ptr, size_t nbyte, int *__restrict dev_info_ptr) {
@@ -1655,7 +1702,7 @@ int sys_iopl(int level) {
 // Neither is ever called from inside the rtld itself.
 #include <stdarg.h>
 
-#ifndef MLIBC_BUILDING_RTLD
+#if !defined(MLIBC_BUILDING_RTLD) || defined(MLIBC_STATIC_BUILD)
 extern "C" long syscall(long number, ...) {
 	va_list ap;
 	va_start(ap, number);
@@ -1682,4 +1729,4 @@ ssize_t readahead(int, off64_t, size_t) {
 	errno = ENOSYS;
 	return -1;
 }
-#endif // !MLIBC_BUILDING_RTLD
+#endif // !MLIBC_BUILDING_RTLD || MLIBC_STATIC_BUILD
