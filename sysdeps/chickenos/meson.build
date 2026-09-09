@@ -92,6 +92,22 @@ if not no_headers
 		follow_symlinks: true
 	)
 
+	# riscv64-only.  mlibc's <sys/hwprobe.h> and its internal-sysdeps.hpp
+	# both include <abi-bits/riscv-hwprobe.h> unconditionally on this arch,
+	# so an ABI without it cannot compile a single riscv64 translation unit
+	# -- the whole libc failed on `fatal error: 'abi-bits/riscv-hwprobe.h'
+	# file not found`.  These are pure ABI constants; the definitions match
+	# the ironclad and keyronex ports exactly.  ChickenOS has no
+	# riscv_hwprobe syscall, so nothing calls __riscv_hwprobe yet; the
+	# header is what the build needs, not the syscall.
+	if host_machine.cpu_family() == 'riscv64'
+		install_headers(
+			'include/abi-bits/riscv-hwprobe.h',
+			subdir: 'abi-bits',
+			follow_symlinks: true
+		)
+	endif
+
 	install_headers(
 		'include/utmp.h',
 	)
