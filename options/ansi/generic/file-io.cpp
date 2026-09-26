@@ -684,10 +684,25 @@ long ftell(FILE *file_base) {
 	return current_offset;
 }
 
+
+namespace {
+	// fflush(NULL) and the exit-time flush walk EVERY open FILE, including
+	// input-only ones.  A FILE with no unwritten output and no read-ahead to
+	// give back has nothing to flush: _save_pos() would only lseek by zero, and
+	// that lseek can FAIL -- toybox's grep fdopen()s fd 0 and fclose()s it, and
+	// the untouched global stdin then flushed an fd that no longer exists
+	// ("mlibc warning: Failed to flush file", EBADF).  glibc skips such streams.
+	bool has_something_to_flush(mlibc::abstract_file *f) {
+		return f->__dirty_begin != f->__dirty_end || f->__offset != f->__io_offset;
+	}
+} // namespace
+
 int fflush_unlocked(FILE *file_base) {
 	if(file_base == nullptr) {
 		// Only flush the files but do not close them.
 		for(auto it : mlibc::global_file_list()) {
+			if(!has_something_to_flush(it))
+				continue;
 			if(int e = it->flush(); e)
 				mlibc::infoLogger() << "mlibc warning: Failed to flush file"
 					<< frg::endlog;
@@ -704,6 +719,8 @@ int fflush(FILE *file_base) {
 		// Only flush the files but do not close them.
 		for(auto it : mlibc::global_file_list()) {
 			frg::unique_lock lock(it->_lock);
+			if(!has_something_to_flush(it))
+				continue;
 			if(int e = it->flush(); e)
 				mlibc::infoLogger() << "mlibc warning: Failed to flush file"
 					<< frg::endlog;
