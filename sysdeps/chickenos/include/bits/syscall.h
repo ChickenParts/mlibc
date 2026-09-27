@@ -22,7 +22,7 @@
 #define SYS_access          0x0C
 #define SYS_dup             0x0D
 #define SYS_dup2            0x0E  /* unified: takes flags */
-#define SYS_dup3            0x0E  /* → dup2 */
+#define SYS_dup3            0x0F
 #define SYS_fcntl64         0x410
 #define SYS_ioctl           0x11
 #define SYS_flock           0x12
@@ -220,16 +220,16 @@
 #define SYS_clone3          0x108
 #define SYS_prctl           0x111
 #define SYS_execveat        0x11B
-#define SYS_getresuid       0x126
-#define SYS_setresuid       0x127
-#define SYS_getresgid       0x128
-#define SYS_setresgid       0x129
-#define SYS_setreuid        0x12A
-#define SYS_setregid        0x12B
-#define SYS_setfsuid        0x12C
-#define SYS_setfsgid        0x12D
-#define SYS_getcpu          0x130
-#define SYS_personality     0x131
+#define SYS_getresuid       0x112
+#define SYS_setresuid       0x113
+#define SYS_getresgid       0x114
+#define SYS_setresgid       0x115
+#define SYS_setreuid        0x116
+#define SYS_setregid        0x117
+#define SYS_setfsuid        0x118
+#define SYS_setfsgid        0x119
+#define SYS_getcpu          0x11A
+#define SYS_personality     0x11C
 #define SYS_close_range     0x4A
 #define SYS_pidfd_open      0x14D
 #define SYS_pidfd_send_signal 0x14E
