@@ -296,7 +296,11 @@ int sys_dup(int fd, int flags, int *newfd) {
 }
 
 int sys_dup2(int fd, int flags, int newfd) {
-	auto ret = do_syscall(SYS_dup2, fd, newfd, flags);
+	sc_result_t ret;
+	if(flags == 0)
+		ret = do_syscall(SYS_dup2, fd, newfd, 0);
+	else
+		ret = do_syscall(SYS_dup3, fd, newfd, flags);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
@@ -949,6 +953,13 @@ void sys_yield() {
 	do_syscall(SYS_sched_yield);
 }
 
+int sys_getcpu(int *cpu) {
+	auto ret = do_syscall(SYS_getcpu, cpu, nullptr, nullptr);
+	if(int e = sc_error(ret); e)
+		return e;
+	return 0;
+}
+
 int sys_getrandom(void *buffer, size_t length, int flags, ssize_t *bytes_written) {
 	auto ret = do_syscall(SYS_getrandom, buffer, length, flags);
 	if(int e = sc_error(ret); e)
@@ -1154,68 +1165,66 @@ int sys_memfd_create(const char *name, int flags, int *fd) {
 // Process/User identity additions
 // ---------------------------------------------------------------------------
 
-/* seteuid: ChickenOS doesn't distinguish real/effective — forward to setuid */
 int sys_seteuid(uid_t euid) {
-	auto ret = do_syscall(SYS_setuid, euid);
+	auto ret = do_syscall(SYS_setresuid, -1, euid, -1);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
 }
 
-/* setegid: ChickenOS doesn't distinguish real/effective — forward to setgid */
 int sys_setegid(gid_t egid) {
-	auto ret = do_syscall(SYS_setgid, egid);
+	auto ret = do_syscall(SYS_setresgid, -1, egid, -1);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
 }
 
-/* No kernel setreuid/setregid/setresuid/setresgid implementations */
 int sys_setreuid(uid_t ruid, uid_t euid) {
-	(void)ruid; (void)euid;
-	mlibc::infoLogger() << "mlibc: sys_setreuid is a stub (no kernel support)" << frg::endlog;
-	return ENOSYS;
+	auto ret = do_syscall(SYS_setreuid, ruid, euid);
+	if(int e = sc_error(ret); e)
+		return e;
+	return 0;
 }
 
 int sys_setregid(gid_t rgid, gid_t egid) {
-	(void)rgid; (void)egid;
-	mlibc::infoLogger() << "mlibc: sys_setregid is a stub (no kernel support)" << frg::endlog;
-	return ENOSYS;
+	auto ret = do_syscall(SYS_setregid, rgid, egid);
+	if(int e = sc_error(ret); e)
+		return e;
+	return 0;
 }
 
 int sys_setresuid(uid_t ruid, uid_t euid, uid_t suid) {
-	(void)ruid; (void)euid; (void)suid;
-	mlibc::infoLogger() << "mlibc: sys_setresuid is a stub (no kernel support)" << frg::endlog;
-	return ENOSYS;
+	auto ret = do_syscall(SYS_setresuid, ruid, euid, suid);
+	if(int e = sc_error(ret); e)
+		return e;
+	return 0;
 }
 
 int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
-	(void)rgid; (void)egid; (void)sgid;
-	mlibc::infoLogger() << "mlibc: sys_setresgid is a stub (no kernel support)" << frg::endlog;
-	return ENOSYS;
+	auto ret = do_syscall(SYS_setresgid, rgid, egid, sgid);
+	if(int e = sc_error(ret); e)
+		return e;
+	return 0;
 }
 
-/* getresuid/getresgid: return the single uid/gid for all three */
 int sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid) {
-	uid_t u = sys_getuid();
-	*ruid = u;
-	*euid = u;
-	*suid = u;
+	auto ret = do_syscall(SYS_getresuid, ruid, euid, suid);
+	if(int e = sc_error(ret); e)
+		return e;
 	return 0;
 }
 
 int sys_getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid) {
-	gid_t g = sys_getgid();
-	*rgid = g;
-	*egid = g;
-	*sgid = g;
+	auto ret = do_syscall(SYS_getresgid, rgid, egid, sgid);
+	if(int e = sc_error(ret); e)
+		return e;
 	return 0;
 }
 
-/* No kernel setgroups implementation; no-op */
 int sys_setgroups(size_t size, const gid_t *list) {
-	(void)size; (void)list;
-	mlibc::infoLogger() << "mlibc: sys_setgroups is a stub (no kernel support, no-op)" << frg::endlog;
+	auto ret = do_syscall(SYS_setgroups, size, list);
+	if(int e = sc_error(ret); e)
+		return e;
 	return 0;
 }
 
@@ -1690,11 +1699,12 @@ int sys_get_current_stack_info(void **stack_base, size_t *stack_size) {
 
 #if __MLIBC_GLIBC_OPTION
 
-/* No kernel personality() implementation */
 int sys_personality(unsigned long persona, int *out) {
-	(void)persona; (void)out;
-	mlibc::infoLogger() << "mlibc: sys_personality is a stub (no kernel support)" << frg::endlog;
-	return ENOSYS;
+	auto ret = do_syscall(SYS_personality, persona);
+	if(int e = sc_error(ret); e)
+		return e;
+	*out = sc_int_result<int>(ret);
+	return 0;
 }
 
 /* No kernel ioperm/iopl implementation — x86-specific privilege control */
