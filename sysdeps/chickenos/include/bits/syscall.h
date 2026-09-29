@@ -145,8 +145,8 @@
 #define SYS_socketpair      0x1C1
 #define SYS_bind            0x1C2
 #define SYS_listen          0x1C3
-#define SYS_accept          0x1C4  /* unified: takes flags */
-#define SYS_accept4         0x1C4  /* → accept */
+#define SYS_accept          0x1C4
+#define SYS_accept4         0x1C5
 #define SYS_connect         0x1C6
 #define SYS_sendto          0x1C7
 #define SYS_recvfrom        0x1C8
