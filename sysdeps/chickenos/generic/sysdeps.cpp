@@ -62,6 +62,15 @@ namespace {
 #else
 	vdso_clock_gettime_t vdso_clock_gettime = nullptr;
 #endif
+
+	using vdso_getcpu_t = long (*)(unsigned *, unsigned *, void *);
+
+#if !MLIBC_BUILDING_RTLD
+	vdso_getcpu_t vdso_getcpu = reinterpret_cast<vdso_getcpu_t>(
+			__dlapi_vdsosym("__vdso_getcpu", "CHICKEN_1.0"));
+#else
+	vdso_getcpu_t vdso_getcpu = nullptr;
+#endif
 #endif
 }
 
@@ -966,6 +975,18 @@ void Sysdeps<Yield>::operator()() {
 }
 
 int Sysdeps<Getcpu>::operator()(int *cpu) {
+#ifndef MLIBC_STATIC_BUILD
+	if(vdso_getcpu) {
+		unsigned cpu_out;
+		long rc = vdso_getcpu(&cpu_out, nullptr, nullptr);
+		if(rc == 0) {
+			*cpu = static_cast<int>(cpu_out);
+			return 0;
+		}
+		if(rc != -ENOSYS)
+			return -rc;
+	}
+#endif
 	auto ret = do_syscall(SYS_getcpu, cpu, nullptr, nullptr);
 	if(int e = sc_error(ret); e)
 		return e;
