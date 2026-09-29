@@ -42,9 +42,13 @@ int unshare(int flags) {
 	return 0;
 }
 
-int sched_setaffinity(pid_t, size_t, const cpu_set_t *) {
-	__ensure(!"Not implemented");
-	__builtin_unreachable();
+int sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask) {
+	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_setaffinity, -1);
+	if(int e = mlibc::sys_setaffinity(pid, cpusetsize, mask); e) {
+		errno = e;
+		return -1;
+	}
+	return 0;
 }
 
 int clone(int (*)(void *), void *, int, void *, ...) {

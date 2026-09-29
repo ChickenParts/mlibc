@@ -1531,21 +1531,17 @@ int sys_shmget(int *shm_id, key_t key, size_t size, int shmflg) {
 // Scheduler/Affinity
 // ---------------------------------------------------------------------------
 
-/* No kernel sched_getaffinity syscall — stub pretends single-CPU */
 int sys_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask) {
-	(void)pid;
-	mlibc::infoLogger() << "mlibc: sys_getaffinity is a stub (no kernel sched_getaffinity)" << frg::endlog;
-	/* Pretend CPU 0 is the only CPU */
-	memset(mask, 0, cpusetsize);
-	if(cpusetsize >= 1)
-		reinterpret_cast<unsigned char *>(mask)[0] = 1;
+	auto ret = do_syscall(SYS_sched_getaffinity, pid, cpusetsize, mask);
+	if(int e = sc_error(ret); e)
+		return e;
 	return 0;
 }
 
-/* No kernel sched_setaffinity syscall — stub ignores request */
 int sys_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask) {
-	(void)pid; (void)cpusetsize; (void)mask;
-	mlibc::infoLogger() << "mlibc: sys_setaffinity is a stub (no kernel sched_setaffinity)" << frg::endlog;
+	auto ret = do_syscall(SYS_sched_setaffinity, pid, cpusetsize, mask);
+	if(int e = sc_error(ret); e)
+		return e;
 	return 0;
 }
 
