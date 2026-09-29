@@ -40,14 +40,14 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg) {
 
 	/* Wait until our parent sets up the TID. */
 	while(!__atomic_load_n(&tcb->tid, __ATOMIC_RELAXED))
-		mlibc::sys_futex_wait(&tcb->tid, 0, nullptr);
+		mlibc::sysdep<FutexWait>(&tcb->tid, 0, nullptr);
 
 	tcb->invokeThreadFunc(entry, user_arg);
 
 	__atomic_store_n(&tcb->didExit, 1, __ATOMIC_RELEASE);
-	mlibc::sys_futex_wake(&tcb->didExit, true);
+	mlibc::sysdep<FutexWake>(&tcb->didExit, true);
 
-	mlibc::sys_thread_exit();
+	mlibc::sysdep<ThreadExit>();
 }
 
 namespace mlibc {
@@ -63,7 +63,7 @@ static constexpr size_t default_stacksize = 0x200000; /* 2 MiB */
  * Pushes the entry point and user_arg onto the top of the stack so that
  * __mlibc_enter_thread can pop them.
  */
-int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb,
+int Sysdeps<PrepareStack>::operator()(void **stack, void *entry, void *user_arg, void *tcb,
 		size_t *stack_size, size_t *guard_size, void **stack_base) {
 	(void)tcb;
 	if(!*stack_size)
@@ -103,7 +103,7 @@ int sys_prepare_stack(void **stack, void *entry, void *user_arg, void *tcb,
  * and SysV semaphore undo (CLONE_SYSVSEM). The TLS pointer is set via
  * CLONE_SETTLS and the parent gets the child TID via CLONE_PARENT_SETTID.
  */
-int sys_clone(void *tcb, pid_t *pid_out, void *stack) {
+int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 	unsigned long flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
 		| CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS
 		| CLONE_PARENT_SETTID;

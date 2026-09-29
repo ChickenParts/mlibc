@@ -33,8 +33,7 @@ pid_t wait(int *status) {
 
 pid_t wait3(int *status, int options, struct rusage *rusage) {
 	pid_t ret;
-	MLIBC_CHECK_OR_ENOSYS(mlibc::sys_waitpid, -1);
-	if(int e = mlibc::sys_waitpid(-1, status, options, rusage, &ret); e) {
+	if(int e = mlibc::sysdep_or_enosys<Waitpid>(-1, status, options, rusage, &ret); e) {
 		errno = e;
 		return -1;
 	}

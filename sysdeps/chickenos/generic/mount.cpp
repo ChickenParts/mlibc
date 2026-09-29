@@ -4,6 +4,7 @@
 
 #include <bits/ensure.h>
 #include <chickenos/syscall.hpp>
+#include <mlibc/all-sysdeps.hpp>
 
 /* These are the [[gnu::weak]] sysdeps options/linux/generic/sys-mount.cpp and
  * sys-statfs.cpp call through (mlibc/linux-sysdeps.hpp); the public mount(2)/
@@ -17,7 +18,7 @@
  * duplicate-symbol errors. */
 namespace mlibc {
 
-int sys_mount(const char *source, const char *target,
+int Sysdeps<Mount>::operator()(const char *source, const char *target,
 		const char *fstype, unsigned long flags, const void *data) {
 	auto ret = do_syscall(SYS_mount, source, target, fstype, (long)flags, data);
 	if(int e = sc_error(ret); e)
@@ -25,21 +26,21 @@ int sys_mount(const char *source, const char *target,
 	return 0;
 }
 
-int sys_umount2(const char *target, int flags) {
+int Sysdeps<Umount2>::operator()(const char *target, int flags) {
 	auto ret = do_syscall(SYS_umount2, target, (long)flags);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
 }
 
-int sys_statfs(const char *path, struct statfs *buf) {
+int Sysdeps<Statfs>::operator()(const char *path, struct statfs *buf) {
 	auto ret = do_syscall(SYS_statfs, path, buf);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
 }
 
-int sys_fstatfs(int fd, struct statfs *buf) {
+int Sysdeps<Fstatfs>::operator()(int fd, struct statfs *buf) {
 	auto ret = do_syscall(SYS_fstatfs, (long)fd, buf);
 	if(int e = sc_error(ret); e)
 		return e;

@@ -4,7 +4,7 @@
 /* mlibc internal macros — used by options/ansi/include/limits.h */
 #define __MLIBC_IOV_MAX 1024
 #define __MLIBC_LOGIN_NAME_MAX 256
-#define __MLIBC_HOST_NAME_MAX 64
+#define __MLIBC_HOST_NAME_MAX 255
 #define __MLIBC_NAME_MAX 255
 #define __MLIBC_OPEN_MAX 256
 

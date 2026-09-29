@@ -29,10 +29,12 @@ libc_sources += files(
 if not no_headers
 	install_headers(
 		'include/abi-bits/access.h',
+		'include/abi-bits/aio.h',
 		'include/abi-bits/auxv.h',
 		'include/abi-bits/blkcnt_t.h',
 		'include/abi-bits/blksize_t.h',
 		'include/abi-bits/clockid_t.h',
+		'include/abi-bits/clone-flags.h',
 		'include/abi-bits/dev_t.h',
 		'include/abi-bits/epoll.h',
 		'include/abi-bits/errno.h',
@@ -62,6 +64,7 @@ if not no_headers
 		'include/abi-bits/rlim_t.h',
 		'include/abi-bits/route.h',
 		'include/abi-bits/sa_family_t.h',
+		'include/abi-bits/sched_param.h',
 		'include/abi-bits/seek-whence.h',
 		'include/abi-bits/sem.h',
 		'include/abi-bits/shm.h',
