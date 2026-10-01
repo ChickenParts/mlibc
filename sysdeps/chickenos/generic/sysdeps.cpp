@@ -75,26 +75,29 @@ namespace {
 }
 
 /* ChickenOS's i386 syscall ABI passes a 64-bit argument (the kernel's off_t is
- * int64) as a lo/hi PAIR of consecutive registers, like Linux's pread64 and
- * ftruncate64 -- src/fs/syscalls/seek.c's sys_lseek(int, off_t, int) is called
+ * int64) as a lo/hi PAIR of consecutive registers (include/chicken/
+ * syscall_numbers.h, "64-bit values"); a 32-bit port uses each call's
+ * SYS_64BIT number -- src/fs/syscalls/seek.c's sys_lseek(int, off_t, int) is called
  * through a 6x`long` table, so a lone truncated word leaves `whence` reading
  * the wrong register (measured: lseek(1, 0, SEEK_CUR) returned an error and
  * printf's flush silently dropped its buffer).  On 64-bit ports one word is
  * the whole value.  Only the call sites that pass an off_t use this. */
 #if defined(__i386__)
+#define OFF_SYS(n) SYS_##n##64
 #define OFF_ARGS(x) static_cast<long>(static_cast<unsigned long long>(x) & 0xffffffffu), \
 		static_cast<long>(static_cast<unsigned long long>(x) >> 32)
 #else
+#define OFF_SYS(n) SYS_##n
 #define OFF_ARGS(x) (x)
 #endif
 
 /* mmap's 64-bit byte offset cannot ride a 6-register int $0x80, so i386 uses
- * mmap2 (0xCE): the offset is a page index.  Every i386 mapping, anonymous
+ * mmap_pages (0xCE): the offset is a page index.  Every i386 mapping, anonymous
  * included, must go through it -- plain SYS_mmap would read its off_t's high
  * word from beyond the six argument registers. */
 #if defined(__i386__)
 #define MMAP_CALL(hint, size, prot, flags, fd, off) \
-	do_syscall(SYS_mmap2, hint, size, prot, flags, fd, static_cast<long>(static_cast<unsigned long long>(off) >> 12))
+	do_syscall(SYS_mmap_pages, hint, size, prot, flags, fd, static_cast<long>(static_cast<unsigned long long>(off) >> 12))
 #else
 #define MMAP_CALL(hint, size, prot, flags, fd, off) \
 	do_syscall(SYS_mmap, hint, size, prot, flags, fd, off)
@@ -229,7 +232,7 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
 #if defined(__i386__)
 	/* The i386 kernel returns lseek's 64-bit result in EDX:EAX; error is
 	 * EDX == -1 with EAX == -errno (a valid offset is never negative). */
-	long long r = __do_syscall4_64(SYS_lseek, fd,
+	long long r = __do_syscall4_64(SYS_lseek64, fd,
 			static_cast<long>(static_cast<unsigned long long>(offset) & 0xffffffffu),
 			static_cast<long>(static_cast<unsigned long long>(offset) >> 32), whence);
 	if(r < 0)
@@ -553,14 +556,14 @@ int Sysdeps<Readlinkat>::operator()(int dirfd, const char *path, void *buffer, s
 }
 
 int Sysdeps<Truncate>::operator()(const char *path, off_t length) {
-	auto ret = do_syscall(SYS_truncate, path, OFF_ARGS(length));
+	auto ret = do_syscall(OFF_SYS(truncate), path, OFF_ARGS(length));
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
 }
 
 int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
-	auto ret = do_syscall(SYS_ftruncate, fd, OFF_ARGS(size));
+	auto ret = do_syscall(OFF_SYS(ftruncate), fd, OFF_ARGS(size));
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
@@ -1177,7 +1180,7 @@ int Sysdeps<Fstatvfs>::operator()(int fd, struct statvfs *out) {
 
 int Sysdeps<Fallocate>::operator()(int fd, off_t offset, size_t size) {
 	/* sys_fallocate(fd, mode, offset, len); mode 0 = allocate */
-	auto ret = do_syscall(SYS_fallocate, fd, 0, OFF_ARGS(offset), OFF_ARGS(static_cast<off_t>(size)));
+	auto ret = do_syscall(OFF_SYS(fallocate), fd, 0, OFF_ARGS(offset), OFF_ARGS(static_cast<off_t>(size)));
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;

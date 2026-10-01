@@ -31,6 +31,10 @@
 #define CLONE_PARENT_SETTID 0x00100000
 #define CLONE_CHILD_CLEARTID 0x00200000
 
+#if defined(__i386__)
+extern "C" long __mlibc_clone_i386(unsigned long flags, void *stack, void *ptid, void *tls_desc, void *ctid);
+#endif
+
 /**
  * Thread entry trampoline — called by the new thread after the kernel
  * starts it. The kernel has already set the TCB via CLONE_SETTLS.
@@ -108,7 +112,26 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 		| CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS
 		| CLONE_PARENT_SETTID;
 
-#if defined(__x86_64__)
+#if defined(__i386__)
+	/* i386: CLONE_SETTLS takes a pointer to a Linux-layout struct user_desc
+	 * (the kernel copies it during the call, so a stack object is fine).  The
+	 * descriptor is identical to the one Sysdeps<TcbSet> installs for the main
+	 * thread.  The child must not return into this function on its new stack,
+	 * so the syscall and the child's jump to __mlibc_enter_thread live in
+	 * __mlibc_clone_i386 (x86/arch-syscall.cpp). */
+	struct {
+		unsigned int entry_number;
+		unsigned int base_addr;
+		unsigned int limit;
+		unsigned int flags;
+	} desc = {
+		.entry_number = 7,
+		.base_addr = reinterpret_cast<unsigned int>(tcb),
+		.limit = 0xFFFFF,
+		.flags = 1u | (1u << 4) | (1u << 6),
+	};
+	auto ret = static_cast<sc_result_t>(__mlibc_clone_i386(flags, stack, pid_out, &desc, nullptr));
+#elif defined(__x86_64__)
 	/* x86_64: FS base is set from the tcb pointer directly */
 	auto ret = do_syscall(SYS_clone, flags, stack, pid_out, tcb, nullptr);
 #elif defined(__aarch64__)

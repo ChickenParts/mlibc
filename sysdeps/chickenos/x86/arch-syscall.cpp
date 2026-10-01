@@ -114,3 +114,44 @@ long long __do_syscall4_64(long sc, sc_word_t arg1, sc_word_t arg2, sc_word_t ar
 		: "memory");
 	return static_cast<long long>((static_cast<unsigned long long>(hi) << 32) | lo);
 }
+
+/*
+ * clone(2) for a new thread.  cdecl: (flags, stack, parent_tid, tls_desc, child_tid).
+ * The child resumes right after the `int $0x80` with EAX == 0 and ESP == `stack`,
+ * whose top two words Sysdeps<PrepareStack> filled with [entry][user_arg]; it
+ * must therefore never return into the C++ caller (that frame is on the parent's
+ * stack).  It pops both and calls __mlibc_enter_thread(entry, user_arg), which
+ * does not return.  ESP is 16-byte aligned at that call.
+ */
+#define CHK_STR2(x) #x
+#define CHK_STR(x) CHK_STR2(x)
+asm(".text\n"
+	".globl __mlibc_clone_i386\n"
+	".type __mlibc_clone_i386,@function\n"
+	"__mlibc_clone_i386:\n\t"
+	"pushl %ebx\n\t"
+	"pushl %esi\n\t"
+	"pushl %edi\n\t"
+	"movl 16(%esp), %ebx\n\t"
+	"movl 20(%esp), %ecx\n\t"
+	"movl 24(%esp), %edx\n\t"
+	"movl 28(%esp), %esi\n\t"
+	"movl 32(%esp), %edi\n\t"
+	"movl $" CHK_STR(SYS_clone) ", %eax\n\t"
+	"int $0x80\n\t"
+	"testl %eax, %eax\n\t"
+	"jnz 1f\n\t"
+	"popl %eax\n\t"
+	"popl %ecx\n\t"
+	"xorl %ebp, %ebp\n\t"
+	"subl $8, %esp\n\t"
+	"pushl %ecx\n\t"
+	"pushl %eax\n\t"
+	"call __mlibc_enter_thread\n\t"
+	"ud2\n"
+	"1:\n\t"
+	"popl %edi\n\t"
+	"popl %esi\n\t"
+	"popl %ebx\n\t"
+	"ret\n"
+	".size __mlibc_clone_i386, .-__mlibc_clone_i386\n");

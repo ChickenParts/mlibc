@@ -15,6 +15,14 @@
 #define SYS_fstat64         0x405
 #define SYS_lstat64         0x406
 #define SYS_lseek           0x07
+#define SYS_lseek64         0x407 /* 32-bit ports: off_t pair in, EDX:EAX out */
+#define SYS_truncate64      0x415
+#define SYS_ftruncate64     0x416
+#define SYS_readahead64     0x419
+#define SYS_fallocate64     0x41A
+#define SYS_preadv64        0x41D
+#define SYS_pwritev64       0x41E
+#define SYS_sync_file_range64 0x424
 #define SYS_pread64         0x408
 #define SYS_pwrite64        0x409
 #define SYS_readv           0x0A
@@ -88,7 +96,7 @@
 #define SYS_munlock         0xC8
 #define SYS_mlockall        0xC9
 #define SYS_munlockall      0xCA
-#define SYS_mmap2           0xCE  /* offset in PAGE_SIZE units (i386) */
+#define SYS_mmap_pages      0xCE  /* mmap, offset in PAGE_SIZE units (32-bit ports) */
 
 /* 0x100-0x13F: Process Control */
 #define SYS_fork            0x100
