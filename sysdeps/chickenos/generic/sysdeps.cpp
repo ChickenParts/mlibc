@@ -131,27 +131,22 @@ int Sysdeps<TcbSet>::operator()(void *pointer) {
 		return e;
 #elif defined(__i386__)
 	/* i386 has no FS/GS base register: TLS is a GDT descriptor.  The kernel
-	 * (src/arch/x86/i386/tls.c) keeps one per-thread slot at
-	 * USER_GS_SEG_NUM = 7 and reloads its base on every context switch;
-	 * set_thread_area reports the entry number, and %gs is then pointed at
-	 * it, so mlibc's `movl %gs:0` (x86-include/mlibc/thread.hpp) reads
-	 * Tcb::selfPointer.  Descriptor layout is Linux's struct user_desc. */
-	struct {
-		unsigned int entry_number;
-		unsigned int base_addr;
-		unsigned int limit;
-		unsigned int flags; /* seg_32bit:0 contents:1-2 read_exec_only:3
-		                       limit_in_pages:4 seg_not_present:5 useable:6 */
-	} desc = {
-		.entry_number = 7,
-		.base_addr = reinterpret_cast<unsigned int>(pointer),
-		.limit = 0xFFFFF,
-		.flags = 1u | (1u << 4) | (1u << 6),
+	 * (src/arch/x86/i386/tls.c) keeps one per-thread, fixed-shape slot and
+	 * reloads its base on every context switch.  We pass only the base in a
+	 * ChickenOS-native struct chicken_tls_desc (<chickenos/tls.h>, mirrored in
+	 * x86/arch-syscall.hpp: this tree builds before the sysroot headers exist);
+	 * the kernel hands back the selector, which we load into %gs so mlibc's
+	 * `movl %gs:0` (x86-include/mlibc/thread.hpp) reads Tcb::selfPointer. */
+	struct chicken_tls_desc desc = {
+		.base = reinterpret_cast<unsigned int>(pointer),
+		.flags = 0,
+		.selector = 0,
+		.reserved = 0,
 	};
 	auto ret = do_syscall(SYS_set_thread_area, &desc);
 	if(int e = sc_error(ret); e)
 		return e;
-	unsigned short sel = static_cast<unsigned short>((desc.entry_number << 3) | 3);
+	unsigned short sel = static_cast<unsigned short>(desc.selector);
 	asm volatile("movw %0, %%gs" :: "r"(sel) : "memory");
 #elif defined(__aarch64__)
 	/* ⚠ + sizeof(Tcb) - 0x10, not the raw pointer.  sys_tcb_set is handed the

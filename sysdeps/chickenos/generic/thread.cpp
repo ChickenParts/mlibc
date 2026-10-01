@@ -113,22 +113,17 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 		| CLONE_PARENT_SETTID;
 
 #if defined(__i386__)
-	/* i386: CLONE_SETTLS takes a pointer to a Linux-layout struct user_desc
-	 * (the kernel copies it during the call, so a stack object is fine).  The
-	 * descriptor is identical to the one Sysdeps<TcbSet> installs for the main
-	 * thread.  The child must not return into this function on its new stack,
-	 * so the syscall and the child's jump to __mlibc_enter_thread live in
-	 * __mlibc_clone_i386 (x86/arch-syscall.cpp). */
-	struct {
-		unsigned int entry_number;
-		unsigned int base_addr;
-		unsigned int limit;
-		unsigned int flags;
-	} desc = {
-		.entry_number = 7,
-		.base_addr = reinterpret_cast<unsigned int>(tcb),
-		.limit = 0xFFFFF,
-		.flags = 1u | (1u << 4) | (1u << 6),
+	/* i386: CLONE_SETTLS takes a pointer to a struct chicken_tls_desc
+	 * (<chickenos/tls.h>; flags/reserved must be zero).  The kernel copies it
+	 * during the call, so a stack object is fine, and the child inherits the
+	 * fixed %gs selector, so none is passed.  The child must not return into
+	 * this function on its new stack, so the syscall and the child's jump to
+	 * __mlibc_enter_thread live in __mlibc_clone_i386 (x86/arch-syscall.cpp). */
+	struct chicken_tls_desc desc = {
+		.base = reinterpret_cast<unsigned int>(tcb),
+		.flags = 0,
+		.selector = 0,
+		.reserved = 0,
 	};
 	auto ret = static_cast<sc_result_t>(__mlibc_clone_i386(flags, stack, pid_out, &desc, nullptr));
 #elif defined(__x86_64__)
