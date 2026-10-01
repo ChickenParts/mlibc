@@ -88,6 +88,7 @@
 #define SYS_munlock         0xC8
 #define SYS_mlockall        0xC9
 #define SYS_munlockall      0xCA
+#define SYS_mmap2           0xCE  /* offset in PAGE_SIZE units (i386) */
 
 /* 0x100-0x13F: Process Control */
 #define SYS_fork            0x100
@@ -323,6 +324,12 @@ __sc_word_t __do_syscall5(long sc, __sc_word_t arg1, __sc_word_t arg2,
 __sc_word_t __do_syscall6(long sc, __sc_word_t arg1, __sc_word_t arg2,
                           __sc_word_t arg3, __sc_word_t arg4,
                           __sc_word_t arg5, __sc_word_t arg6);
+
+#if defined(__i386__)
+/* Four-argument syscall whose result is a 64-bit value in EDX:EAX (lseek). */
+long long __do_syscall4_64(long sc, __sc_word_t arg1, __sc_word_t arg2,
+                           __sc_word_t arg3, __sc_word_t arg4);
+#endif
 
 #ifdef __cplusplus
 }

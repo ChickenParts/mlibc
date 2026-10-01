@@ -88,6 +88,18 @@ namespace {
 #define OFF_ARGS(x) (x)
 #endif
 
+/* mmap's 64-bit byte offset cannot ride a 6-register int $0x80, so i386 uses
+ * mmap2 (0xCE): the offset is a page index.  Every i386 mapping, anonymous
+ * included, must go through it -- plain SYS_mmap would read its off_t's high
+ * word from beyond the six argument registers. */
+#if defined(__i386__)
+#define MMAP_CALL(hint, size, prot, flags, fd, off) \
+	do_syscall(SYS_mmap2, hint, size, prot, flags, fd, static_cast<long>(static_cast<unsigned long long>(off) >> 12))
+#else
+#define MMAP_CALL(hint, size, prot, flags, fd, off) \
+	do_syscall(SYS_mmap, hint, size, prot, flags, fd, off)
+#endif
+
 #define STUB_ONLY { \
 	mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub" << frg::endlog; \
 	return ENOSYS; \
@@ -173,7 +185,7 @@ int Sysdeps<TcbSet>::operator()(void *pointer) {
 }
 
 int Sysdeps<AnonAllocate>::operator()(size_t size, void **pointer) {
-	auto ret = do_syscall(SYS_mmap, 0, size,
+	auto ret = MMAP_CALL(0, size,
 		PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if(int e = sc_error(ret); e)
@@ -214,11 +226,23 @@ int Sysdeps<Write>::operator()(int fd, const void *buffer, size_t size, ssize_t 
 }
 
 int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
+#if defined(__i386__)
+	/* The i386 kernel returns lseek's 64-bit result in EDX:EAX; error is
+	 * EDX == -1 with EAX == -errno (a valid offset is never negative). */
+	long long r = __do_syscall4_64(SYS_lseek, fd,
+			static_cast<long>(static_cast<unsigned long long>(offset) & 0xffffffffu),
+			static_cast<long>(static_cast<unsigned long long>(offset) >> 32), whence);
+	if(r < 0)
+		return -static_cast<int>(r);
+	*new_offset = r;
+	return 0;
+#else
 	auto ret = do_syscall(SYS_lseek, fd, OFF_ARGS(offset), whence);
 	if(int e = sc_error(ret); e)
 		return e;
 	*new_offset = sc_int_result<off_t>(ret);
 	return 0;
+#endif
 }
 
 int Sysdeps<Close>::operator()(int fd) {
@@ -246,7 +270,11 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, [[may
 
 int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags,
 		int fd, off_t offset, void **window) {
-	auto ret = do_syscall(SYS_mmap, hint, size, prot, flags, fd, offset);
+#if defined(__i386__)
+	if(offset & 0xfff)
+		return EINVAL;
+#endif
+	auto ret = MMAP_CALL(hint, size, prot, flags, fd, offset);
 	// mmap returns MAP_FAILED on error
 	auto addr = sc_int_result<long>(ret);
 	if(addr >= -4096L && addr < 0) {
@@ -1147,25 +1175,43 @@ int Sysdeps<Fstatvfs>::operator()(int fd, struct statvfs *out) {
 	return 0;
 }
 
-/* No kernel fallocate implementation */
 int Sysdeps<Fallocate>::operator()(int fd, off_t offset, size_t size) {
-	(void)fd; (void)offset; (void)size;
-	mlibc::infoLogger() << "mlibc: sys_fallocate is a stub (no kernel support)" << frg::endlog;
-	return ENOSYS;
-}
-
-/* fadvise is advisory-only; safe to ignore */
-int Sysdeps<Fadvise>::operator()(int fd, off_t offset, off_t length, int advice) {
-	(void)fd; (void)offset; (void)length; (void)advice;
-	mlibc::infoLogger() << "mlibc: sys_fadvise is a stub (advisory, ignored)" << frg::endlog;
+	/* sys_fallocate(fd, mode, offset, len); mode 0 = allocate */
+	auto ret = do_syscall(SYS_fallocate, fd, 0, OFF_ARGS(offset), OFF_ARGS(static_cast<off_t>(size)));
+	if(int e = sc_error(ret); e)
+		return e;
 	return 0;
 }
 
-/* No kernel splice implementation */
+int Sysdeps<Fadvise>::operator()(int fd, off_t offset, off_t length, int advice) {
+	auto ret = do_syscall(SYS_fadvise64, fd, OFF_ARGS(offset), OFF_ARGS(length), advice);
+	if(int e = sc_error(ret); e)
+		return e;
+	return 0;
+}
+
 int Sysdeps<Splice>::operator()(int in_fd, off_t *in_off, int out_fd, off_t *out_off, size_t size, unsigned int flags, ssize_t *out) {
-	(void)in_fd; (void)in_off; (void)out_fd; (void)out_off; (void)size; (void)flags; (void)out;
-	mlibc::infoLogger() << "mlibc: sys_splice is a stub (no kernel support)" << frg::endlog;
-	return ENOSYS;
+	auto ret = do_syscall(SYS_splice, in_fd, in_off, out_fd, out_off, size, flags);
+	if(int e = sc_error(ret); e)
+		return e;
+	*out = sc_int_result<ssize_t>(ret);
+	return 0;
+}
+
+int Sysdeps<Sendfile>::operator()(int outfd, int infd, off_t *offset, size_t count, ssize_t *out) {
+	auto ret = do_syscall(SYS_sendfile, outfd, infd, offset, count);
+	if(int e = sc_error(ret); e)
+		return e;
+	*out = sc_int_result<ssize_t>(ret);
+	return 0;
+}
+
+int Sysdeps<CopyFileRange>::operator()(int fd_in, off_t *off_in, int fd_out, off_t *off_out, size_t count, unsigned int flags, ssize_t *bytes_copied) {
+	auto ret = do_syscall(SYS_copy_file_range, fd_in, off_in, fd_out, off_out, count, flags);
+	if(int e = sc_error(ret); e)
+		return e;
+	*bytes_copied = sc_int_result<ssize_t>(ret);
+	return 0;
 }
 
 /* No kernel name_to_handle_at implementation */

@@ -101,3 +101,16 @@ sc_word_t __do_syscall6(long sc, sc_word_t arg1, sc_word_t arg2, sc_word_t arg3,
 		: "memory");
 	return ret;
 }
+
+/* lseek: 64-bit result returned in EDX:EAX by the kernel's i386 entry. */
+long long __do_syscall4_64(long sc, sc_word_t arg1, sc_word_t arg2, sc_word_t arg3,
+		sc_word_t arg4) {
+	unsigned int lo, hi;
+	asm volatile("xchgl %%ebx, %3\n\t"
+		"int $0x80\n\t"
+		"xchgl %%ebx, %3"
+		: "=a"(lo), "=d"(hi)
+		: "a"(sc), "r"(arg1), "c"(arg2), "1"(arg3), "S"(arg4)
+		: "memory");
+	return static_cast<long long>((static_cast<unsigned long long>(hi) << 32) | lo);
+}

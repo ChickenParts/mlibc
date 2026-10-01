@@ -143,6 +143,8 @@ struct ChickenOSSysdepTags :
 	Waitid,
 	NameToHandleAt,
 	Splice,
+	Sendfile,
+	CopyFileRange,
 	Shmat,
 	Shmctl,
 	Shmdt,
