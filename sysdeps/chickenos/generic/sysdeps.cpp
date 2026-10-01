@@ -74,6 +74,20 @@ namespace {
 #endif
 }
 
+/* ChickenOS's i386 syscall ABI passes a 64-bit argument (the kernel's off_t is
+ * int64) as a lo/hi PAIR of consecutive registers, like Linux's pread64 and
+ * ftruncate64 -- src/fs/syscalls/seek.c's sys_lseek(int, off_t, int) is called
+ * through a 6x`long` table, so a lone truncated word leaves `whence` reading
+ * the wrong register (measured: lseek(1, 0, SEEK_CUR) returned an error and
+ * printf's flush silently dropped its buffer).  On 64-bit ports one word is
+ * the whole value.  Only the call sites that pass an off_t use this. */
+#if defined(__i386__)
+#define OFF_ARGS(x) static_cast<long>(static_cast<unsigned long long>(x) & 0xffffffffu), \
+		static_cast<long>(static_cast<unsigned long long>(x) >> 32)
+#else
+#define OFF_ARGS(x) (x)
+#endif
+
 #define STUB_ONLY { \
 	mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub" << frg::endlog; \
 	return ENOSYS; \
@@ -100,6 +114,30 @@ int Sysdeps<TcbSet>::operator()(void *pointer) {
 	auto ret = do_syscall(SYS_arch_prctl, 0x1002 /* ARCH_SET_FS */, pointer);
 	if(int e = sc_error(ret); e)
 		return e;
+#elif defined(__i386__)
+	/* i386 has no FS/GS base register: TLS is a GDT descriptor.  The kernel
+	 * (src/arch/x86/i386/tls.c) keeps one per-thread slot at
+	 * USER_GS_SEG_NUM = 7 and reloads its base on every context switch;
+	 * set_thread_area reports the entry number, and %gs is then pointed at
+	 * it, so mlibc's `movl %gs:0` (x86-include/mlibc/thread.hpp) reads
+	 * Tcb::selfPointer.  Descriptor layout is Linux's struct user_desc. */
+	struct {
+		unsigned int entry_number;
+		unsigned int base_addr;
+		unsigned int limit;
+		unsigned int flags; /* seg_32bit:0 contents:1-2 read_exec_only:3
+		                       limit_in_pages:4 seg_not_present:5 useable:6 */
+	} desc = {
+		.entry_number = 7,
+		.base_addr = reinterpret_cast<unsigned int>(pointer),
+		.limit = 0xFFFFF,
+		.flags = 1u | (1u << 4) | (1u << 6),
+	};
+	auto ret = do_syscall(SYS_set_thread_area, &desc);
+	if(int e = sc_error(ret); e)
+		return e;
+	unsigned short sel = static_cast<unsigned short>((desc.entry_number << 3) | 3);
+	asm volatile("movw %0, %%gs" :: "r"(sel) : "memory");
 #elif defined(__aarch64__)
 	/* ⚠ + sizeof(Tcb) - 0x10, not the raw pointer.  sys_tcb_set is handed the
 	 * TCB address, but the thread pointer is defined relative to the TLS
@@ -176,7 +214,7 @@ int Sysdeps<Write>::operator()(int fd, const void *buffer, size_t size, ssize_t 
 }
 
 int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
-	auto ret = do_syscall(SYS_lseek, fd, offset, whence);
+	auto ret = do_syscall(SYS_lseek, fd, OFF_ARGS(offset), whence);
 	if(int e = sc_error(ret); e)
 		return e;
 	*new_offset = sc_int_result<off_t>(ret);
@@ -487,14 +525,14 @@ int Sysdeps<Readlinkat>::operator()(int dirfd, const char *path, void *buffer, s
 }
 
 int Sysdeps<Truncate>::operator()(const char *path, off_t length) {
-	auto ret = do_syscall(SYS_truncate, path, length);
+	auto ret = do_syscall(SYS_truncate, path, OFF_ARGS(length));
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
 }
 
 int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
-	auto ret = do_syscall(SYS_ftruncate, fd, size);
+	auto ret = do_syscall(SYS_ftruncate, fd, OFF_ARGS(size));
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
@@ -920,7 +958,7 @@ int Sysdeps<Uname>::operator()(struct utsname *buf) {
 }
 
 int Sysdeps<Pread>::operator()(int fd, void *buf, size_t n, off_t off, ssize_t *bytes_read) {
-	auto ret = do_syscall(SYS_pread64, fd, buf, n, off);
+	auto ret = do_syscall(SYS_pread64, fd, buf, n, OFF_ARGS(off));
 	if(int e = sc_error(ret); e)
 		return e;
 	*bytes_read = sc_int_result<ssize_t>(ret);
@@ -928,7 +966,7 @@ int Sysdeps<Pread>::operator()(int fd, void *buf, size_t n, off_t off, ssize_t *
 }
 
 int Sysdeps<Pwrite>::operator()(int fd, const void *buf, size_t n, off_t off, ssize_t *bytes_written) {
-	auto ret = do_syscall(SYS_pwrite64, fd, buf, n, off);
+	auto ret = do_syscall(SYS_pwrite64, fd, buf, n, OFF_ARGS(off));
 	if(int e = sc_error(ret); e)
 		return e;
 	*bytes_written = sc_int_result<ssize_t>(ret);

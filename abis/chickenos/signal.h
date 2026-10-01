@@ -319,6 +319,109 @@ typedef struct __ucontext {
 	unsigned long __ssp[4];
 } ucontext_t;
 
+#elif defined(__i386__)
+
+#define REG_GS 0
+#define REG_FS 1
+#define REG_ES 2
+#define REG_DS 3
+#define REG_EDI 4
+#define REG_ESI 5
+#define REG_EBP 6
+#define REG_ESP 7
+#define REG_EBX 8
+#define REG_EDX 9
+#define REG_ECX 10
+#define REG_EAX 11
+#define REG_TRAPNO 12
+#define REG_ERR 13
+#define REG_EIP 14
+#define REG_CS 15
+#define REG_EFL 16
+#define REG_UESP 17
+#define REG_SS 18
+#define NGREG 19
+
+struct _fpreg {
+	unsigned short significand[4];
+	unsigned short exponent;
+};
+
+struct _fpxreg {
+	unsigned short significand[4];
+	unsigned short exponent;
+	unsigned short padding[3];
+};
+
+struct _xmmreg {
+	__mlibc_uint32 element[4];
+};
+
+struct _fpstate {
+	__mlibc_uint32 cw;
+	__mlibc_uint32 sw;
+	__mlibc_uint32 tag;
+	__mlibc_uint32 ipoff;
+	__mlibc_uint32 cssel;
+	__mlibc_uint32 dataoff;
+	__mlibc_uint32 datasel;
+	struct _fpreg _st[8];
+	__mlibc_uint16 status;
+	__mlibc_uint16 magic;
+
+	/* FXSR FPU */
+
+	__mlibc_uint32 _fxsr_env[6];
+	__mlibc_uint32 mxscr;
+	__mlibc_uint32 reserved;
+	struct _fpxreg _fxsr_st[8];
+	struct _xmmreg _xmm[8];
+
+	__mlibc_uint32 padding2[56];
+};
+
+#if defined(_DEFAULT_SOURCE)
+struct sigcontext {
+	unsigned short gs, __gsh, fs, __fsh, es, __esh, ds, __dsh;
+	unsigned long edi, esi, ebp, esp, ebx, edx, ecx, eax;
+	unsigned long trapno, err, eip;
+	unsigned short cs, __csh;
+	unsigned long eflags, esp_at_signal;
+	unsigned short ss, __ssh;
+	struct _fpstate *fpstate;
+	unsigned long oldmask, cr2;
+};
+#endif
+
+typedef struct {
+	int gregs[NGREG];
+	struct _fpstate *fpregs;
+	unsigned long oldmask;
+	unsigned long cr2;
+} mcontext_t;
+
+struct _libc_fpstate {
+	__mlibc_uint32 cw;
+	__mlibc_uint32 sw;
+	__mlibc_uint32 tag;
+	__mlibc_uint32 ipoff;
+	__mlibc_uint32 cssel;
+	__mlibc_uint32 dataoff;
+	__mlibc_uint32 datasel;
+	struct _fpreg _st[8];
+	__mlibc_uint32 status;
+};
+
+typedef struct __ucontext {
+	unsigned long uc_flags;
+	struct __ucontext *uc_link;
+	stack_t uc_stack;
+	mcontext_t uc_mcontext;
+	sigset_t uc_sigmask;
+	struct _libc_fpstate __fpregs_mem;
+	unsigned long __ssp[4];
+} ucontext_t;
+
 #elif defined(__riscv) && __riscv_xlen == 64
 /* Definitions from Linux kernel headers. */
 
