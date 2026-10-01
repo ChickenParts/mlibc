@@ -394,7 +394,7 @@ Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *result
 }
 
 int
-Sysdeps<Ftruncate>::operator()(int fd, size_t size)
+Sysdeps<Ftruncate>::operator()(int fd, off_t size)
 {
 	int r = syscall2(SYS_ftruncate, fd, size, NULL);
 	if (r < 0)

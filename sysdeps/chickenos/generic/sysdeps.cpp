@@ -557,7 +557,7 @@ int Sysdeps<Truncate>::operator()(const char *path, off_t length) {
 	return 0;
 }
 
-int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
+int Sysdeps<Ftruncate>::operator()(int fd, off_t size) {
 	auto ret = do_syscall(OFF_SYS(ftruncate), fd, OFF_ARGS(size));
 	if(int e = sc_error(ret); e)
 		return e;

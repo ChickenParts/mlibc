@@ -978,7 +978,7 @@ leave:
 		return syscall(SYSCALL_MOUNT, &ret, (uint64_t)source, (uint64_t)target, (uint64_t)fstype, flags, (uint64_t)data);
 	}
 
-	int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
+	int Sysdeps<Ftruncate>::operator()(int fd, off_t size) {
 		long ret;
 		return syscall(SYSCALL_FTRUNCATE, &ret, fd, size);
 	}

@@ -111,7 +111,7 @@ SYSDEP_FUNC(Fstatvfs, int fd, struct statvfs *out);
 SYSDEP_FUNC(Readlink, const char *path, void *buffer, size_t max_size, ssize_t *length);
 SYSDEP_FUNC(Readlinkat, int dirfd, const char *path, void *buffer, size_t max_size, ssize_t *length);
 SYSDEP_FUNC(Truncate, const char *path, off_t length);
-SYSDEP_FUNC(Ftruncate, int fd, size_t size);
+SYSDEP_FUNC(Ftruncate, int fd, off_t size);
 SYSDEP_FUNC(Fallocate, int fd, off_t offset, size_t size);
 SYSDEP_FUNC(Openat, int dirfd, const char *path, int flags, mode_t mode, int *fd);
 SYSDEP_FUNC(Socket, int family, int type, int protocol, int *fd);

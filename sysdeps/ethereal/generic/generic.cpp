@@ -609,7 +609,7 @@ int Sysdeps<SetHostname>::operator()(const char *buffer, size_t bufsize) {
 	return -(SYSCALL2(SYS_SETHOSTNAME, buffer, bufsize));
 }
 
-int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
+int Sysdeps<Ftruncate>::operator()(int fd, off_t size) {
 	return -SYSCALL2(SYS_FTRUNCATE, fd, size);
 }
 

@@ -2514,7 +2514,7 @@ int Sysdeps<Rmdir>::operator()(const char *path) {
 	return 0;
 }
 
-int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
+int Sysdeps<Ftruncate>::operator()(int fd, off_t size) {
 	SignalGuard sguard;
 
 	auto handle = getHandleForFd(fd);

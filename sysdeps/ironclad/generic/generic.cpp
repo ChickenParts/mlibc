@@ -248,7 +248,7 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
 	return errno;
 }
 
-int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
+int Sysdeps<Ftruncate>::operator()(int fd, off_t size) {
 	int ret, errno;
 	SYSCALL2(SYSCALL_TRUNCATE, fd, size);
 	return errno;

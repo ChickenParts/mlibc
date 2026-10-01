@@ -169,7 +169,7 @@ int Sysdeps<Rmdir>::operator()(const char *path) {
 	return zinnia_syscall(SYSCALL_RMDIRAT, AT_FDCWD, (size_t)path).error;
 }
 
-int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
+int Sysdeps<Ftruncate>::operator()(int fd, off_t size) {
 	return zinnia_syscall(SYSCALL_FTRUNCATE, fd, size).error;
 }
 
