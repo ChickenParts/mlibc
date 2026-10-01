@@ -186,6 +186,10 @@ static_assert(offsetof(Tcb, cancelBits) == 0x18);
 static_assert(sizeof(Tcb) - offsetof(Tcb, dtvPointers) - TP_TCB_OFFSET == 112);
 // sysdeps/linux/aarch64/cp_syscall.S uses the offset of cancelBits.
 static_assert(sizeof(Tcb) - offsetof(Tcb, cancelBits) - TP_TCB_OFFSET == 88);
+#elif defined(__riscv) && __riscv_xlen == 32
+// riscv32: same convention as riscv64 (tp points *after* the TCB); the number
+// is the distance from cancelBits to the end of the struct with 4-byte words.
+static_assert(sizeof(Tcb) - offsetof(Tcb, cancelBits) == 52);
 #elif defined(__riscv) && __riscv_xlen == 64
 // The thread pointer on RISC-V points to *after* the TCB, and since
 // we need to access specific fields that means that the value in

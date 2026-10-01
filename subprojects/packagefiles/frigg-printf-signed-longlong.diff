@@ -20,3 +20,16 @@ index bce5e24..2ed0f65 100644
  					opts.precision ? *opts.precision : 1, opts.fill_zeros ? '0' : ' ',
  					opts.left_justify, opts.group_thousands, opts.always_sign,
  					opts.plus_becomes_space, false, locale_opts);
+diff --git a/include/frg/sharded_slab.hpp b/include/frg/sharded_slab.hpp
+index 1c92c03..2ebe3b0 100644
+--- a/include/frg/sharded_slab.hpp
++++ b/include/frg/sharded_slab.hpp
+@@ -178,7 +178,7 @@ struct pool {
+ 	// We used to do this for all architectures, but some architectures do not
+ 	// implement this as builtins. These should provide the required libatomic
+ 	// symbols themselves, if needed.
+-#if defined(__x86_64__) || defined(__aarch64__) || defined(__riscv) || defined(__loongarch64)
++#if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64) || defined(__loongarch64)
+ 	static_assert(std::atomic<chunk_state>::is_always_lock_free);
+ #endif
+ 

@@ -49,6 +49,24 @@ struct __mlibc_jmpbuf_register_state {
 	__mlibc_uint64 __d14;
 	__mlibc_uint64 __d15;
 };
+#elif defined (__riscv) && __riscv_xlen == 32
+/* rv32imac / ilp32 (soft float): no FP registers to save. */
+struct __mlibc_jmpbuf_register_state {
+	__mlibc_uint32 __ra;
+	__mlibc_uint32 __s0;
+	__mlibc_uint32 __s1;
+	__mlibc_uint32 __s2;
+	__mlibc_uint32 __s3;
+	__mlibc_uint32 __s4;
+	__mlibc_uint32 __s5;
+	__mlibc_uint32 __s6;
+	__mlibc_uint32 __s7;
+	__mlibc_uint32 __s8;
+	__mlibc_uint32 __s9;
+	__mlibc_uint32 __s10;
+	__mlibc_uint32 __s11;
+	__mlibc_uint32 __sp;
+};
 #elif defined (__riscv) && __riscv_xlen == 64
 struct __mlibc_jmpbuf_register_state {
 	__mlibc_uint64 __ra;

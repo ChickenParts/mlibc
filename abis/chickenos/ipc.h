@@ -20,7 +20,7 @@ extern "C" {
 
 #define IPC_PRIVATE ((key_t) 0)
 
-#if defined(__aarch64__) || defined(__i386__) || defined(__m68k__)
+#if defined(__aarch64__) || defined(__i386__) || defined(__m68k__) || (defined(__riscv) && __riscv_xlen == 32)
 #define IPC_64 0x100
 #elif defined(__x86_64__) || (defined(__riscv) && __riscv_xlen == 64) || defined(__loongarch64)
 #define IPC_64 0

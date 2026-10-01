@@ -60,7 +60,7 @@ typedef __INT64_TYPE__ __mlibc_int64;
 
 /* Fast types (signed). */
 
-#if defined (__i386__)
+#if defined (__i386__) || (defined (__riscv) && __riscv_xlen == 32)
 
 typedef __mlibc_int8 __mlibc_int_fast8;
 #define __MLIBC_INT_FAST8_C(x) __MLIBC_INT8_C(x)
@@ -198,7 +198,7 @@ typedef __mlibc_int64 __mlibc_int_fast64;
 
 /* Fast types (unsigned). */
 
-#if defined (__i386__)
+#if defined (__i386__) || (defined (__riscv) && __riscv_xlen == 32)
 
 typedef __mlibc_uint8 __mlibc_uint_fast8;
 #define __MLIBC_UINT_FAST8_C(x) __MLIBC_UINT8_C(x)

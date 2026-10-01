@@ -289,7 +289,7 @@ struct sigaction {
 #define CHICKEN_GREG_PC 32
 #define CHICKEN_GREG_PSTATE 33
 #define CHICKEN_NGREG 34
-#elif defined(__riscv) && __riscv_xlen == 64
+#elif defined(__riscv)
 #define CHICKEN_GREG_PC 0
 #define CHICKEN_GREG_RA 1
 #define CHICKEN_GREG_SP 2
@@ -329,6 +329,10 @@ __CHICKEN_SA(sizeof(ucontext_t) == 312, "ucontext size");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");
 __CHICKEN_SA(sizeof(ucontext_t) == 440, "ucontext size");
+#elif defined(__riscv) && __riscv_xlen == 32
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 20, "ucontext sigmask offset");
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 148, "ucontext mcontext offset");
+__CHICKEN_SA(sizeof(ucontext_t) == 276, "ucontext size");
 #else /* riscv64 */
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");

@@ -54,7 +54,7 @@ typedef struct {
 	unsigned int __fpsr;
 } fenv_t;
 
-#elif defined(__riscv) && __riscv_xlen == 64
+#elif defined(__riscv)
 
 #define FE_INEXACT 1
 #define FE_UNDERFLOW 2

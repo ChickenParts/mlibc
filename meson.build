@@ -505,7 +505,7 @@ internal_sources = [
 	'options/internal' / host_machine.cpu_family() / 'fenv.S',
 ]
 
-if host_machine.cpu_family() == 'riscv64'
+if host_machine.cpu_family() in ['riscv32', 'riscv64']
 	internal_sources += [
 		'options/internal/riscv64/hwprobe.cpp',
 	]
@@ -516,9 +516,9 @@ if not no_headers
 		'options/internal/include/stdint.h'
 	)
 
-	if host_machine.cpu_family() == 'riscv64'
+	if host_machine.cpu_family() in ['riscv32', 'riscv64']
 		install_headers(
-			'options/internal/riscv64-include/sys/hwprobe.h',
+			'options/internal' / host_machine.cpu_family() + '-include/sys/hwprobe.h',
 			subdir: 'sys'
 		)
 	endif

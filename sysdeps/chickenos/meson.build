@@ -95,7 +95,7 @@ if not no_headers
 		follow_symlinks: true
 	)
 
-	# riscv64-only.  mlibc's <sys/hwprobe.h> and its internal-sysdeps.hpp
+	# riscv32/riscv64.  mlibc's <sys/hwprobe.h> and its internal-sysdeps.hpp
 	# both include <abi-bits/riscv-hwprobe.h> unconditionally on this arch,
 	# so an ABI without it cannot compile a single riscv64 translation unit
 	# -- the whole libc failed on `fatal error: 'abi-bits/riscv-hwprobe.h'
@@ -103,7 +103,7 @@ if not no_headers
 	# the ironclad and keyronex ports exactly.  ChickenOS has no
 	# riscv_hwprobe syscall, so nothing calls __riscv_hwprobe yet; the
 	# header is what the build needs, not the syscall.
-	if host_machine.cpu_family() == 'riscv64'
+	if host_machine.cpu_family() in ['riscv32', 'riscv64']
 		install_headers(
 			'include/abi-bits/riscv-hwprobe.h',
 			subdir: 'abi-bits',
@@ -146,8 +146,8 @@ if not headers_only
 		install_dir: get_option('libdir')
 	)
 
-	# riscv64 gets crti/crtn from the compiler
-	if host_machine.cpu_family() != 'riscv64'
+	# riscv32/riscv64 get crti/crtn from the compiler
+	if not (host_machine.cpu_family() in ['riscv32', 'riscv64'])
 		custom_target('crti',
 			build_by_default: true,
 			command: crt_asm_args,

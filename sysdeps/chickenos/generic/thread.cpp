@@ -31,6 +31,10 @@
 #define CLONE_PARENT_SETTID 0x00100000
 #define CLONE_CHILD_CLEARTID 0x00200000
 
+#if defined(__riscv) && __riscv_xlen == 32
+extern "C" long __mlibc_clone_riscv32(unsigned long flags, void *stack, void *ptid, void *tls, void *ctid);
+#endif
+
 #if defined(__i386__)
 extern "C" long __mlibc_clone_i386(unsigned long flags, void *stack, void *ptid, void *tls_desc, void *ctid);
 #endif
@@ -133,6 +137,14 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 	/* aarch64: TP should point 16 bytes before end of TCB */
 	auto tp = reinterpret_cast<char *>(tcb) + sizeof(Tcb) - 0x10;
 	auto ret = do_syscall(SYS_clone, flags, stack, pid_out, reinterpret_cast<void *>(tp), nullptr);
+#elif defined(__riscv) && __riscv_xlen == 32
+	/* riscv32: TP should point to the address immediately after the TCB, and the
+	 * kernel installs the CLONE_SETTLS value as the child's tp.  The child must
+	 * not return into this function on its new stack, so the ecall and the
+	 * child's jump to __mlibc_enter_thread live in __mlibc_clone_riscv32
+	 * (riscv32/arch-syscall.cpp). */
+	auto tls = reinterpret_cast<char *>(tcb) + sizeof(Tcb);
+	auto ret = static_cast<sc_result_t>(__mlibc_clone_riscv32(flags, stack, pid_out, tls, nullptr));
 #elif defined(__riscv)
 	/* riscv64: TP should point to address immediately after TCB */
 	auto tls = reinterpret_cast<char *>(tcb) + sizeof(Tcb);

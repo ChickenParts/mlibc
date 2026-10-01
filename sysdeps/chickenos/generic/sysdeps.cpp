@@ -82,7 +82,7 @@ namespace {
  * the wrong register (measured: lseek(1, 0, SEEK_CUR) returned an error and
  * printf's flush silently dropped its buffer).  On 64-bit ports one word is
  * the whole value.  Only the call sites that pass an off_t use this. */
-#if defined(__i386__)
+#if defined(__CHICKEN_PAIR_ABI)
 #define OFF_SYS(n) SYS_##n##64
 #define OFF_ARGS(x) static_cast<long>(static_cast<unsigned long long>(x) & 0xffffffffu), \
 		static_cast<long>(static_cast<unsigned long long>(x) >> 32)
@@ -95,7 +95,7 @@ namespace {
  * mmap_pages (0xCE): the offset is a page index.  Every i386 mapping, anonymous
  * included, must go through it -- plain SYS_mmap would read its off_t's high
  * word from beyond the six argument registers. */
-#if defined(__i386__)
+#if defined(__CHICKEN_PAIR_ABI)
 #define MMAP_CALL(hint, size, prot, flags, fd, off) \
 	do_syscall(SYS_mmap_pages, hint, size, prot, flags, fd, static_cast<long>(static_cast<unsigned long long>(off) >> 12))
 #else
@@ -224,7 +224,7 @@ int Sysdeps<Write>::operator()(int fd, const void *buffer, size_t size, ssize_t 
 }
 
 int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
-#if defined(__i386__)
+#if defined(__CHICKEN_PAIR_ABI)
 	/* The i386 kernel returns lseek's 64-bit result in EDX:EAX; error is
 	 * EDX == -1 with EAX == -errno (a valid offset is never negative). */
 	long long r = __do_syscall4_64(SYS_lseek64, fd,
@@ -276,7 +276,7 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
 
 int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags,
 		int fd, off_t offset, void **window) {
-#if defined(__i386__)
+#if defined(__CHICKEN_PAIR_ABI)
 	if(offset & 0xfff)
 		return EINVAL;
 #endif

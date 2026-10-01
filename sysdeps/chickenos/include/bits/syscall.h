@@ -317,6 +317,14 @@
 extern "C" {
 #endif
 
+/* 32-bit-register ports (i386, riscv32) pass a 64-bit value (off_t) as two
+ * consecutive argument registers, low word first, and use each call's
+ * SYS_64BIT (0x4xx) number; see include/chicken/syscall_numbers.h in the kernel
+ * tree ("64-bit values on 32-bit-register ports"). */
+#if defined(__i386__) || (defined(__riscv) && __riscv_xlen == 32)
+#define __CHICKEN_PAIR_ABI 1
+#endif
+
 typedef long __sc_word_t;
 
 __sc_word_t __do_syscall0(long sc);
@@ -333,8 +341,9 @@ __sc_word_t __do_syscall6(long sc, __sc_word_t arg1, __sc_word_t arg2,
                           __sc_word_t arg3, __sc_word_t arg4,
                           __sc_word_t arg5, __sc_word_t arg6);
 
-#if defined(__i386__)
-/* Four-argument syscall whose result is a 64-bit value in EDX:EAX (lseek). */
+#if defined(__CHICKEN_PAIR_ABI)
+/* Four-argument syscall whose result is a 64-bit value in the result-register
+ * pair (lseek): EDX:EAX on i386, a1:a0 on riscv32. */
 long long __do_syscall4_64(long sc, __sc_word_t arg1, __sc_word_t arg2,
                            __sc_word_t arg3, __sc_word_t arg4);
 #endif
