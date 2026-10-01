@@ -399,8 +399,50 @@ int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
 	return 0;
 }
 
+/* The kernel's record-lock argument: fixed-width, identical on every port
+ * (kernel include/chickenos/flock.h; keep in sync). */
+namespace {
+	struct chicken_flock {
+		int16_t l_type;
+		int16_t l_whence;
+		int32_t l_pad0;
+		int64_t l_start;
+		int64_t l_len;
+		int32_t l_pid;
+		int32_t l_pad1;
+	};
+	static_assert(sizeof(chicken_flock) == 32, "chicken_flock layout");
+}
+
 int Sysdeps<Fcntl>::operator()(int fd, int cmd, va_list args, int *result) {
 	auto arg = va_arg(args, unsigned long);
+
+	if(cmd == F_GETLK || cmd == F_SETLK || cmd == F_SETLKW
+			|| cmd == F_OFD_GETLK || cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW) {
+		auto *fl = reinterpret_cast<struct flock *>(arg);
+		if(!fl)
+			return EFAULT;
+		bool ofd = (cmd == F_OFD_GETLK || cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW);
+		chicken_flock k = {};
+		k.l_type = fl->l_type;
+		k.l_whence = fl->l_whence;
+		k.l_start = fl->l_start;
+		k.l_len = fl->l_len;
+		k.l_pid = ofd ? 0 : fl->l_pid; /* OFD requires zero; POSIX ignores it */
+		auto kret = do_syscall(SYS_fcntl64, fd, cmd, &k);
+		if(int e = sc_error(kret); e)
+			return e;
+		if(cmd == F_GETLK || cmd == F_OFD_GETLK) {
+			fl->l_type = k.l_type;
+			fl->l_whence = k.l_whence;
+			fl->l_start = k.l_start;
+			fl->l_len = k.l_len;
+			fl->l_pid = k.l_pid;
+		}
+		*result = sc_int_result<int>(kret);
+		return 0;
+	}
+
 	auto ret = do_syscall(SYS_fcntl64, fd, cmd, arg);
 	if(int e = sc_error(ret); e)
 		return e;

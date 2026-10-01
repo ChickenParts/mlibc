@@ -44,19 +44,22 @@
 #define F_SETSIG 10
 #define F_GETSIG 11
 
-#if __INTPTR_WIDTH__ == 64
+/* ChickenOS record locks (see <chickenos/flock.h> in the kernel tree): the lock
+ * commands are the SAME numbers on every port, because the kernel takes a
+ * fixed-layout struct chicken_flock by pointer (64-bit offsets everywhere) and
+ * this libc converts to and from its public struct flock in Sysdeps<Fcntl>.
+ * The Linux i386 numbers (12/13/14, for a 64-bit-off_t struct) are NOT used. */
 #define F_GETLK64 5
 #define F_SETLK64 6
 #define F_SETLKW64 7
-#else
-#define F_GETLK64 12
-#define F_SETLK64 13
-#define F_SETLKW64 14
-#endif
 
 #define F_GETLK F_GETLK64
 #define F_SETLK F_SETLK64
 #define F_SETLKW F_SETLKW64
+
+#define F_OFD_GETLK 36
+#define F_OFD_SETLK 37
+#define F_OFD_SETLKW 38
 
 #define F_SETOWN_EX 15
 #define F_GETOWN_EX 16
