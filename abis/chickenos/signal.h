@@ -227,350 +227,115 @@ struct sigaction {
 #define sa_handler __sa_handler.sa_handler
 #define sa_sigaction __sa_handler.sa_sigaction
 
-/* Taken from the linux kernel headers */
-
+/*
+ * ucontext_t: what a SA_SIGINFO handler receives as its third argument.
+ *
+ * ChickenOS-native, NOT Linux's: no x87/SSE state, trap numbers, CR2 or
+ * "oldmask" padding.  This is a MIRROR of the kernel's definition in
+ * include/chickenos/ucontext.h (this tree is built before the sysroot receives
+ * the kernel's uapi headers, so it cannot include it).  The register-slot
+ * numbers and the sizes asserted below are the contract; the kernel asserts the
+ * same numbers and has a ktest (signal.frame_layout) over its side.  See
+ * signal(7) and sigaction(2) in docs/man.
+ *
+ * Handlers may rewrite uc_mcontext.gregs[] (e.g. CHICKEN_GREG_PC to skip a
+ * faulting instruction) and uc_sigmask; sigreturn resumes with the edited
+ * values.  FP/SIMD state is not saved, exposed or restored.
+ */
+#ifndef CHICKEN_NGREG
 #if defined(__x86_64__)
-
-#ifdef _DEFAULT_SOURCE
-#	define __pollution(n) n
-#else
-#	define __pollution(n) __ ## n
-#endif
-
-#if defined(_GNU_SOURCE)
-#define REG_R8 0
-#define REG_R9 1
-#define REG_R10 2
-#define REG_R11 3
-#define REG_R12 4
-#define REG_R13 5
-#define REG_R14 6
-#define REG_R15 7
-#define REG_RDI 8
-#define REG_RSI 9
-#define REG_RBP 10
-#define REG_RBX 11
-#define REG_RDX 12
-#define REG_RAX 13
-#define REG_RCX 14
-#define REG_RSP 15
-#define REG_RIP 16
-#define REG_EFL 17
-#define REG_CSGSFS 18
-#define REG_ERR 19
-#define REG_TRAPNO 20
-#define REG_OLDMASK 21
-#define REG_CR2 22
-#endif
-
-#define __NGREG 23
-#if defined(_DEFAULT_SOURCE)
-#define NGREG __NREG
-#endif
-
-struct _fpxreg {
-	unsigned short __pollution(significand)[4];
-	unsigned short __pollution(exponent);
-	unsigned short __padding[3];
-};
-
-struct _xmmreg {
-	__mlibc_uint32 __pollution(element)[4];
-};
-
-struct _fpstate {
-	__mlibc_uint16 __pollution(cwd);
-	__mlibc_uint16 __pollution(swd);
-	__mlibc_uint16 __pollution(ftw);
-	__mlibc_uint16 __pollution(fop);
-	__mlibc_uint64 __pollution(rip);
-	__mlibc_uint64 __pollution(rdp);
-	__mlibc_uint32 __pollution(mxcsr);
-	__mlibc_uint32 __pollution(mxcr_mask);
-	struct _fpxreg _st[8];
-	struct _xmmreg _xmm[16];
-	__mlibc_uint32 __padding[24];
-};
-
-#if defined(_DEFAULT_SOURCE)
-struct sigcontext {
-	unsigned long r8, r9, r10, r11, r12, r13, r14, r15;
-	unsigned long rdi, rsi, rbp, rbx, rdx, rax, rcx, rsp, rip, eflags;
-	unsigned short cs, gs, fs, ss;
-	unsigned long err, trapno, oldmask, cr2;
-	struct _fpstate *fpstate;
-	unsigned long __reserved1[8];
-};
-#endif
-
-typedef struct {
-	unsigned long __pollution(gregs)[__NGREG];
-	struct _fpstate *__pollution(fpregs);
-	unsigned long __reserved1[8];
-} mcontext_t;
-
-typedef struct __ucontext {
-	unsigned long __pollution(uc_flags);
-	struct __ucontext *uc_link;
-	stack_t uc_stack;
-	mcontext_t uc_mcontext;
-	sigset_t uc_sigmask;
-	struct _fpstate __fpregs_mem;
-	unsigned long __ssp[4];
-} ucontext_t;
-
+#define CHICKEN_GREG_R15 0
+#define CHICKEN_GREG_R14 1
+#define CHICKEN_GREG_R13 2
+#define CHICKEN_GREG_R12 3
+#define CHICKEN_GREG_R11 4
+#define CHICKEN_GREG_R10 5
+#define CHICKEN_GREG_R9 6
+#define CHICKEN_GREG_R8 7
+#define CHICKEN_GREG_RDI 8
+#define CHICKEN_GREG_RSI 9
+#define CHICKEN_GREG_RBP 10
+#define CHICKEN_GREG_RSP 11
+#define CHICKEN_GREG_RBX 12
+#define CHICKEN_GREG_RDX 13
+#define CHICKEN_GREG_RCX 14
+#define CHICKEN_GREG_RAX 15
+#define CHICKEN_GREG_RIP 16
+#define CHICKEN_GREG_RFLAGS 17
+#define CHICKEN_NGREG 18
+#define CHICKEN_GREG_PC CHICKEN_GREG_RIP
+#define CHICKEN_GREG_SP CHICKEN_GREG_RSP
 #elif defined(__i386__)
-
-#define REG_GS 0
-#define REG_FS 1
-#define REG_ES 2
-#define REG_DS 3
-#define REG_EDI 4
-#define REG_ESI 5
-#define REG_EBP 6
-#define REG_ESP 7
-#define REG_EBX 8
-#define REG_EDX 9
-#define REG_ECX 10
-#define REG_EAX 11
-#define REG_TRAPNO 12
-#define REG_ERR 13
-#define REG_EIP 14
-#define REG_CS 15
-#define REG_EFL 16
-#define REG_UESP 17
-#define REG_SS 18
-#define NGREG 19
-
-struct _fpreg {
-	unsigned short significand[4];
-	unsigned short exponent;
-};
-
-struct _fpxreg {
-	unsigned short significand[4];
-	unsigned short exponent;
-	unsigned short padding[3];
-};
-
-struct _xmmreg {
-	__mlibc_uint32 element[4];
-};
-
-struct _fpstate {
-	__mlibc_uint32 cw;
-	__mlibc_uint32 sw;
-	__mlibc_uint32 tag;
-	__mlibc_uint32 ipoff;
-	__mlibc_uint32 cssel;
-	__mlibc_uint32 dataoff;
-	__mlibc_uint32 datasel;
-	struct _fpreg _st[8];
-	__mlibc_uint16 status;
-	__mlibc_uint16 magic;
-
-	/* FXSR FPU */
-
-	__mlibc_uint32 _fxsr_env[6];
-	__mlibc_uint32 mxscr;
-	__mlibc_uint32 reserved;
-	struct _fpxreg _fxsr_st[8];
-	struct _xmmreg _xmm[8];
-
-	__mlibc_uint32 padding2[56];
-};
-
-#if defined(_DEFAULT_SOURCE)
-struct sigcontext {
-	unsigned short gs, __gsh, fs, __fsh, es, __esh, ds, __dsh;
-	unsigned long edi, esi, ebp, esp, ebx, edx, ecx, eax;
-	unsigned long trapno, err, eip;
-	unsigned short cs, __csh;
-	unsigned long eflags, esp_at_signal;
-	unsigned short ss, __ssh;
-	struct _fpstate *fpstate;
-	unsigned long oldmask, cr2;
-};
-#endif
-
-typedef struct {
-	int gregs[NGREG];
-	struct _fpstate *fpregs;
-	unsigned long oldmask;
-	unsigned long cr2;
-} mcontext_t;
-
-struct _libc_fpstate {
-	__mlibc_uint32 cw;
-	__mlibc_uint32 sw;
-	__mlibc_uint32 tag;
-	__mlibc_uint32 ipoff;
-	__mlibc_uint32 cssel;
-	__mlibc_uint32 dataoff;
-	__mlibc_uint32 datasel;
-	struct _fpreg _st[8];
-	__mlibc_uint32 status;
-};
-
-typedef struct __ucontext {
-	unsigned long uc_flags;
-	struct __ucontext *uc_link;
-	stack_t uc_stack;
-	mcontext_t uc_mcontext;
-	sigset_t uc_sigmask;
-	struct _libc_fpstate __fpregs_mem;
-	unsigned long __ssp[4];
-} ucontext_t;
-
+#define CHICKEN_GREG_EDI 0
+#define CHICKEN_GREG_ESI 1
+#define CHICKEN_GREG_EBP 2
+#define CHICKEN_GREG_ESP 3
+#define CHICKEN_GREG_EBX 4
+#define CHICKEN_GREG_EDX 5
+#define CHICKEN_GREG_ECX 6
+#define CHICKEN_GREG_EAX 7
+#define CHICKEN_GREG_EIP 8
+#define CHICKEN_GREG_EFLAGS 9
+#define CHICKEN_GREG_DS 10
+#define CHICKEN_GREG_ES 11
+#define CHICKEN_GREG_FS 12
+#define CHICKEN_GREG_GS 13
+#define CHICKEN_NGREG 14
+#define CHICKEN_GREG_PC CHICKEN_GREG_EIP
+#define CHICKEN_GREG_SP CHICKEN_GREG_ESP
+#elif defined(__aarch64__)
+#define CHICKEN_GREG_X0 0
+#define CHICKEN_GREG_SP 31
+#define CHICKEN_GREG_PC 32
+#define CHICKEN_GREG_PSTATE 33
+#define CHICKEN_NGREG 34
 #elif defined(__riscv) && __riscv_xlen == 64
-/* Definitions from Linux kernel headers. */
-
-#define NGREG 32
-
-enum {
-  REG_PC = 0,
-#define REG_PC REG_PC
-  REG_RA = 1,
-#define REG_RA REG_RA
-  REG_SP = 2,
-#define REG_SP REG_SP
-  REG_TP = 4,
-#define REG_TP REG_TP
-  REG_S0 = 8,
-#define REG_S0 REG_S0
-  REG_A0 = 10
-#define REG_A0 REG_A0
-};
-
-struct __riscv_f_ext_state {
-	__mlibc_uint32 f[32];
-	__mlibc_uint32 fcsr;
-};
-
-struct __riscv_d_ext_state {
-	__mlibc_uint64 f[32];
-	__mlibc_uint32 fcsr;
-};
-
-struct __riscv_q_ext_state {
-	__mlibc_uint64 f[64] __attribute__((__aligned__(16)));
-	__mlibc_uint32 fcsr;
-	__mlibc_uint32 reserved[3];
-};
-
-union __riscv_fp_state {
-	struct __riscv_f_ext_state f;
-	struct __riscv_d_ext_state d;
-	struct __riscv_q_ext_state q;
-};
-
-typedef unsigned long __riscv_mc_gp_state[NGREG];
-
-typedef struct sigcontext {
-	__riscv_mc_gp_state gregs;
-	union __riscv_fp_state fpregs;
-} mcontext_t;
-
-typedef struct __ucontext {
-	unsigned long uc_flags;
-	struct __ucontext *uc_link;
-	stack_t uc_stack;
-	union {
-		sigset_t uc_sigmask;
-		__mlibc_uint8 __unused[1024 / 8];
-	} __uc_sigmask_union;
-	mcontext_t uc_mcontext;
-} ucontext_t;
-
-#define uc_sigmask __uc_sigmask_union.uc_sigmask
-
-#elif defined (__aarch64__)
-
-#define NGREG 34
-
-typedef struct sigcontext {
-	__mlibc_uint64 fault_address;
-	__mlibc_uint64 regs[31];
-	__mlibc_uint64 sp;
-	__mlibc_uint64 pc;
-	__mlibc_uint64 pstate;
-	__mlibc_uint8 __reserved[4096]  __attribute__ ((__aligned__ (16)));
-} mcontext_t;
-
-#define FPSIMD_MAGIC 0x46508001
-#define ESR_MAGIC 0x45535201
-#define EXTRA_MAGIC 0x45585401
-#define SVE_MAGIC 0x53564501
-struct _aarch64_ctx {
-	__mlibc_uint32 magic;
-	__mlibc_uint32 size;
-};
-struct fpsimd_context {
-	struct _aarch64_ctx head;
-	__mlibc_uint32 fpsr;
-	__mlibc_uint32 fpcr;
-	__uint128_t vregs[32];
-};
-struct esr_context {
-	struct _aarch64_ctx head;
-	__mlibc_uint64 esr;
-};
-struct extra_context {
-	struct _aarch64_ctx head;
-	__mlibc_uint64 datap;
-	__mlibc_uint32 size;
-	__mlibc_uint32 __reserved[3];
-};
-struct sve_context {
-	struct _aarch64_ctx head;
-	__mlibc_uint16 vl;
-	__mlibc_uint16 __reserved[3];
-};
-#define SVE_VQ_BYTES		16
-#define SVE_VQ_MIN		1
-#define SVE_VQ_MAX		512
-#define SVE_VL_MIN		(SVE_VQ_MIN * SVE_VQ_BYTES)
-#define SVE_VL_MAX		(SVE_VQ_MAX * SVE_VQ_BYTES)
-#define SVE_NUM_ZREGS		32
-#define SVE_NUM_PREGS		16
-#define sve_vl_valid(vl) \
-	((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
-#define sve_vq_from_vl(vl)	((vl) / SVE_VQ_BYTES)
-#define sve_vl_from_vq(vq)	((vq) * SVE_VQ_BYTES)
-#define SVE_SIG_ZREG_SIZE(vq)	((unsigned)(vq) * SVE_VQ_BYTES)
-#define SVE_SIG_PREG_SIZE(vq)	((unsigned)(vq) * (SVE_VQ_BYTES / 8))
-#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
-#define SVE_SIG_REGS_OFFSET					\
-	((sizeof(struct sve_context) + (SVE_VQ_BYTES - 1))	\
-		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
-#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
-#define SVE_SIG_ZREG_OFFSET(vq, n) \
-	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
-#define SVE_SIG_ZREGS_SIZE(vq) \
-	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
-#define SVE_SIG_PREGS_OFFSET(vq) \
-	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
-#define SVE_SIG_PREG_OFFSET(vq, n) \
-	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
-#define SVE_SIG_PREGS_SIZE(vq) \
-	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
-#define SVE_SIG_FFR_OFFSET(vq) \
-	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
-#define SVE_SIG_REGS_SIZE(vq) \
-	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
-#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
-
-typedef struct __ucontext {
-	unsigned long uc_flags;
-	struct __ucontext *uc_link;
-	stack_t uc_stack;
-	sigset_t uc_sigmask;
-	mcontext_t uc_mcontext;
-} ucontext_t;
-
+#define CHICKEN_GREG_PC 0
+#define CHICKEN_GREG_RA 1
+#define CHICKEN_GREG_SP 2
+#define CHICKEN_GREG_A0 10
+#define CHICKEN_NGREG 32
 #else
 #error "Missing architecture specific code."
 #endif
+#endif /* CHICKEN_NGREG */
+
+typedef struct {
+	unsigned long gregs[CHICKEN_NGREG];
+} mcontext_t;
+
+typedef struct __ucontext {
+	unsigned long uc_flags;
+	struct __ucontext *uc_link;
+	stack_t uc_stack;
+	sigset_t uc_sigmask;
+	mcontext_t uc_mcontext;
+} ucontext_t;
+
+#if defined(__cplusplus)
+#define __CHICKEN_SA static_assert
+#else
+#define __CHICKEN_SA _Static_assert
+#endif
+#if defined(__i386__)
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 20, "ucontext sigmask offset");
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 148, "ucontext mcontext offset");
+__CHICKEN_SA(sizeof(ucontext_t) == 204, "ucontext size");
+#elif defined(__x86_64__)
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");
+__CHICKEN_SA(sizeof(ucontext_t) == 312, "ucontext size");
+#elif defined(__aarch64__)
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");
+__CHICKEN_SA(sizeof(ucontext_t) == 440, "ucontext size");
+#else /* riscv64 */
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");
+__CHICKEN_SA(sizeof(ucontext_t) == 424, "ucontext size");
+#endif
+__CHICKEN_SA(sizeof(siginfo_t) == 128, "siginfo_t size");
+#undef __CHICKEN_SA
 
 #ifdef __cplusplus
 }
