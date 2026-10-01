@@ -250,16 +250,24 @@ int Sysdeps<Close>::operator()(int fd) {
 	return 0;
 }
 
-int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, [[maybe_unused]] int flags,
+int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int flags,
 		struct stat *statbuf) {
 	sc_result_t ret;
 	if(fsfdt == fsfd_target::path) {
-		ret = do_syscall(SYS_stat64, path, statbuf);
+		// lstat() arrives here as a path stat with AT_SYMLINK_NOFOLLOW; ignoring
+		// the flag made lstat() follow the link (S_ISLNK never true).
+		if(flags & AT_SYMLINK_NOFOLLOW)
+			ret = do_syscall(SYS_lstat64, path, statbuf);
+		else
+			ret = do_syscall(SYS_stat64, path, statbuf);
 	} else if(fsfdt == fsfd_target::fd) {
 		ret = do_syscall(SYS_fstat64, fd, statbuf);
 	} else {
+		// fstatat(dirfd, path, flags): the path is relative to the directory fd
+		// (AT_EMPTY_PATH is handled by the kernel).  This used to fstat the
+		// directory itself and ignore the path.
 		__ensure(fsfdt == fsfd_target::fd_path);
-		ret = do_syscall(SYS_fstat64, fd, statbuf);
+		ret = do_syscall(SYS_newfstatat, fd, path, statbuf, flags);
 	}
 	if(int e = sc_error(ret); e)
 		return e;
