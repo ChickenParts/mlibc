@@ -953,8 +953,23 @@ int Sysdeps<MsgRecv>::operator()(int sockfd, struct msghdr *msg, int flags, ssiz
 	return 0;
 }
 
+namespace {
+	// The kernel numbers its TCP keepalive options itself (ChickenOS issue #7); a program sees the usual
+	// TCP_KEEPIDLE/TCP_KEEPINTVL/TCP_KEEPCNT (4/5/6).  Translate where the option reaches the system call.
+	int chicken_sockopt_name(int layer, int number) {
+		if(layer != 6 /* IPPROTO_TCP */)
+			return number;
+		switch(number) {
+			case 4: return 0x10; // TCP_KEEPIDLE
+			case 5: return 0x11; // TCP_KEEPINTVL
+			case 6: return 0x12; // TCP_KEEPCNT
+			default: return number;
+		}
+	}
+}
+
 int Sysdeps<SetSockopt>::operator()(int fd, int layer, int number, const void *buffer, socklen_t size) {
-	auto ret = do_syscall(SYS_setsockopt, fd, layer, number, buffer, size);
+	auto ret = do_syscall(SYS_setsockopt, fd, layer, chicken_sockopt_name(layer, number), buffer, size);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
@@ -962,7 +977,7 @@ int Sysdeps<SetSockopt>::operator()(int fd, int layer, int number, const void *b
 
 int Sysdeps<GetSockopt>::operator()(int fd, int layer, int number, void *__restrict buffer,
 		socklen_t *__restrict size) {
-	auto ret = do_syscall(SYS_getsockopt, fd, layer, number, buffer, size);
+	auto ret = do_syscall(SYS_getsockopt, fd, layer, chicken_sockopt_name(layer, number), buffer, size);
 	if(int e = sc_error(ret); e)
 		return e;
 	return 0;
