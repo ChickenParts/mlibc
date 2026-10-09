@@ -412,6 +412,20 @@ namespace {
 		int32_t l_pad1;
 	};
 	static_assert(sizeof(chicken_flock) == 32, "chicken_flock layout");
+
+	// The kernel numbers its record-lock commands itself (include/chickenos/flock.h in the kernel tree);
+	// they are not the F_GETLK/F_SETLK/F_SETLKW/F_OFD_* values a program sees. Translate here.
+	int chicken_lock_cmd(int cmd) {
+		switch(cmd) {
+			case F_GETLK: return 0x40;
+			case F_SETLK: return 0x41;
+			case F_SETLKW: return 0x42;
+			case F_OFD_GETLK: return 0x43;
+			case F_OFD_SETLK: return 0x44;
+			case F_OFD_SETLKW: return 0x45;
+			default: return cmd;
+		}
+	}
 }
 
 int Sysdeps<Fcntl>::operator()(int fd, int cmd, va_list args, int *result) {
@@ -429,7 +443,7 @@ int Sysdeps<Fcntl>::operator()(int fd, int cmd, va_list args, int *result) {
 		k.l_start = fl->l_start;
 		k.l_len = fl->l_len;
 		k.l_pid = ofd ? 0 : fl->l_pid; /* OFD requires zero; POSIX ignores it */
-		auto kret = do_syscall(SYS_fcntl64, fd, cmd, &k);
+		auto kret = do_syscall(SYS_fcntl64, fd, chicken_lock_cmd(cmd), &k);
 		if(int e = sc_error(kret); e)
 			return e;
 		if(cmd == F_GETLK || cmd == F_OFD_GETLK) {
