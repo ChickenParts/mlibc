@@ -99,3 +99,20 @@ foreach(profile v5-arm v5-thumb v7-arm v7-thumb)
   DEPENDS ${out}.elf USES_TERMINAL VERBATIM)
  add_dependencies(check check_syscall_${profile})
 endforeach()
+foreach(state arm thumb)
+ set(out ${CMAKE_CURRENT_BINARY_DIR}/crt-${state})
+ add_custom_command(OUTPUT ${out}.elf
+  COMMAND ${ARM_CC} --target=arm-none-eabi -march=armv5te -m${state} -mfloat-abi=soft
+   -O2 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -static -fuse-ld=lld
+   -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/test.ld,-e,test_start
+   ${CMAKE_CURRENT_SOURCE_DIR}/crt_test.c ${CMAKE_CURRENT_SOURCE_DIR}/crt_start.S
+   ${root}/sysdeps/chickenos/arm/crt-src/crt1.S ${root}/sysdeps/chickenos/arm/crt-src/crti.S ${CMAKE_CURRENT_SOURCE_DIR}/crt_sections.S ${root}/sysdeps/chickenos/arm/crt-src/crtn.S -o ${out}.elf
+  DEPENDS crt_test.c crt_start.S test.ld ${root}/sysdeps/chickenos/arm/crt-src/crt1.S ${root}/sysdeps/chickenos/arm/crt-src/crti.S crt_sections.S ${root}/sysdeps/chickenos/arm/crt-src/crtn.S VERBATIM)
+ add_custom_target(check_crt_${state}
+  COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/run_loader.rb --marker=ARM32_CRT_OK
+   ${ARM_QEMU} -machine virt -cpu cortex-a15 -m 128M -kernel ${out}.elf
+   -semihosting-config enable=on,target=native -display none -serial none -no-reboot
+   -qmp unix:${CMAKE_CURRENT_BINARY_DIR}/chickenos-mlibc-crt-${state}.sock,server,nowait
+  DEPENDS ${out}.elf USES_TERMINAL VERBATIM)
+ add_dependencies(check check_crt_${state})
+endforeach()
