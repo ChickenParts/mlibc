@@ -321,7 +321,7 @@ extern "C" {
  * consecutive argument registers, low word first, and use each call's
  * SYS_64BIT (0x4xx) number; see include/chicken/syscall_numbers.h in the kernel
  * tree ("64-bit values on 32-bit-register ports"). */
-#if defined(__i386__) || (defined(__riscv) && __riscv_xlen == 32)
+#if defined(__i386__) || defined(__arm__) || (defined(__riscv) && __riscv_xlen == 32)
 #define __CHICKEN_PAIR_ABI 1
 #endif
 

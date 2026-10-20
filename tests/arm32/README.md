@@ -43,3 +43,18 @@ JUMP_SLOT; this is not yet shared-libc/dlopen/TLS acceptance.
 absolute and undefined weak symbols, unresolved strong symbols, malformed
 record sizes, misalignment, unsupported types and RELA PLT refusal. The bootstrap
 operates only on its own trusted loaded image; it is not an untrusted ELF parser.
+
+## ChickenOS syscall/TLS helper ABI
+
+Four `check_syscall_v5-arm`, `check_syscall_v5-thumb`, `check_syscall_v7-arm`
+and `check_syscall_v7-thumb` executions enter actual user mode and trap through
+an executable SVC vector. The fixture handler validates zero through six
+argument registers and returns a known 64-bit r1:r0 pair. These are the port's
+actual assembly entry points, called using the compiler's AAPCS stack/register
+convention. The TLS helper preserves r1-r3/r7; pre-v7 calls SYS_get_thread_area,
+while v7 reads TPIDRURO. The syscall number is statically checked against the
+ChickenOS header. All four cases execute on Cortex-A15; the v5 cases exercise
+the older-ISA library path, not an older kernel/vector implementation.
+
+This is an ABI execution fixture, not the complete ChickenOS kernel. That kernel
+must still implement ARM32 syscall dispatch, wide results and per-thread TP state.
