@@ -125,6 +125,14 @@ if not headers_only
 
 	mlibc_c_args = ['-Wno-unused-function', '-D__MLIBC_BUILDING_MLIBC', '-D_GNU_SOURCE', '-nostdlibinc', '-fno-builtin', '-ffreestanding']
 	mlibc_link_args = ['-nostdlib']
+	# Clang's ARM BareMetal driver forces static linking. Select its ELF
+	# shared-link driver for libraries only; objects keep the ChickenOS ABI.
+	# This affects linking only, never the compilation/sysdeps selection.
+	# Pass shared intent only for library links, never executable tests or archives.
+	mlibc_shared_link_args = []
+	if host_machine.cpu_family() == 'arm' and cpp_compiler.get_id() == 'clang'
+		mlibc_shared_link_args += ['--target=arm-unknown-linux-gnueabi']
+	endif
 	add_project_arguments('-Werror=misleading-indentation', language: ['c', 'cpp'])
 	add_project_arguments('-fno-rtti', '-fno-exceptions', language: 'cpp')
 
@@ -575,6 +583,9 @@ rtld_sources += [
 ]
 
 rtld_dso_sources += ['options/rtld' / host_machine.cpu_family() / 'entry.S']
+if host_machine.cpu_family() == 'arm'
+	rtld_dso_sources += ['options/rtld/arm/relocate.c']
+endif
 
 static_cpp_args = []
 ld_cpp_args = []
@@ -672,7 +683,7 @@ if not headers_only
 		ld_shared_lib = shared_library(ld_library_name, rtld_sources + rtld_dso_sources,
 			name_prefix: '',
 			cpp_args: mlibc_c_args + ld_cpp_args,
-			link_args: mlibc_link_args,
+			link_args: mlibc_link_args + mlibc_shared_link_args,
 			include_directories: rtld_include_dirs,
 			dependencies: rtld_deps + rtlib_deps,
 			install: true
@@ -686,20 +697,20 @@ if not headers_only
 			dependencies: libc_deps + rtlib_deps,
 			link_with: [ld_shared_lib],
 			link_whole: libc_sublibs,
-			link_args: ['-Wl,--version-script,' + hide_everything_ld, mlibc_link_args],
+			link_args: ['-Wl,--version-script,' + hide_everything_ld, mlibc_link_args, mlibc_shared_link_args],
 			link_depends: [hide_everything_ld],
 			install: true
 		)
 	endif
 
-	library('pthread', 'dummy-libs/libpthread/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
-	library('rt', 'dummy-libs/librt/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
-	library('util', 'dummy-libs/libutil/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
-	library('m', 'dummy-libs/libm/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
-	library('resolv', 'dummy-libs/libresolv/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
-	library('dl', 'dummy-libs/libdl/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
-	library('ssp', 'dummy-libs/libssp/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
-	library('ssp_nonshared', 'dummy-libs/libssp_nonshared/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args, install: true)
+	library('pthread', 'dummy-libs/libpthread/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
+	library('rt', 'dummy-libs/librt/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
+	library('util', 'dummy-libs/libutil/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
+	library('m', 'dummy-libs/libm/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
+	library('resolv', 'dummy-libs/libresolv/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
+	library('dl', 'dummy-libs/libdl/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
+	library('ssp', 'dummy-libs/libssp/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
+	library('ssp_nonshared', 'dummy-libs/libssp_nonshared/src/dummy.cpp', cpp_args: libc_cpp_args, link_args: mlibc_link_args + mlibc_shared_link_args, install: true)
 endif
 
 summary_info = {}

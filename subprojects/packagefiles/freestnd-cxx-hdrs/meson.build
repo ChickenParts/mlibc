@@ -7,7 +7,9 @@ endif
 # ChickenOS: these are GCC's freestanding headers, which are generic across the
 # riscv family (the riscv64 and i686 trees differ by two x86-only config lines);
 # there is no riscv32 tree, so riscv32 borrows riscv64's.
-if cpu == 'riscv32'
+# ARM uses the same generic freestanding declarations; compiler builtins select
+# its actual integer, pointer and floating-point types (no RISC-V runtime code).
+if cpu in ['riscv32', 'arm']
   cpu = 'riscv64'
 endif
 

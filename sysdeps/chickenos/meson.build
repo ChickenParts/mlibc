@@ -15,6 +15,7 @@ libc_include_dirs += chickenos_include_dirs
 chickenos_arch_syscall = host_machine.cpu_family() / 'arch-syscall.cpp'
 if host_machine.cpu_family() == 'arm'
 	chickenos_arch_syscall = 'arm/arch-syscall.S'
+	libc_sources += files('arm/clone.S')
 endif
 
 rtld_sources += files(

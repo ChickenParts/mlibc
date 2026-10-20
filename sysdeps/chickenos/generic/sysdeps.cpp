@@ -16,6 +16,9 @@
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
 #include <sched.h>
+#if defined(__arm__)
+#include <mlibc/tls-layout.h>
+#endif
 
 namespace {
 	/* Resolved once at load time.  __dlapi_vdsosym lives in the rtld, so a
@@ -148,7 +151,14 @@ int Sysdeps<TcbSet>::operator()(void *pointer) {
 		return e;
 	unsigned short sel = static_cast<unsigned short>(desc.selector);
 	asm volatile("movw %0, %%gs" :: "r"(sel) : "memory");
+#elif defined(__arm__)
+	// The initial ARM TLS block starts eight bytes above the thread pointer.
+	uintptr_t thread_data = __mlibc_arm_tp_from_tcb(reinterpret_cast<uintptr_t>(pointer), sizeof(Tcb));
+	auto ret = do_syscall(SYS_set_thread_area, thread_data);
+	if(int e = sc_error(ret); e)
+		return e;
 #elif defined(__aarch64__)
+
 	/* ⚠ + sizeof(Tcb) - 0x10, not the raw pointer.  sys_tcb_set is handed the
 	 * TCB address, but the thread pointer is defined relative to the TLS
 	 * blocks that FOLLOW it: aarch64-include/mlibc/thread.hpp recovers the TCB

@@ -283,7 +283,15 @@ struct sigaction {
 #define CHICKEN_NGREG 14
 #define CHICKEN_GREG_PC CHICKEN_GREG_EIP
 #define CHICKEN_GREG_SP CHICKEN_GREG_ESP
+#elif defined(__arm__)
+#define CHICKEN_GREG_R0 0
+#define CHICKEN_GREG_SP 13
+#define CHICKEN_GREG_LR 14
+#define CHICKEN_GREG_PC 15
+#define CHICKEN_GREG_CPSR 16
+#define CHICKEN_NGREG 17
 #elif defined(__aarch64__)
+
 #define CHICKEN_GREG_X0 0
 #define CHICKEN_GREG_SP 31
 #define CHICKEN_GREG_PC 32
@@ -325,6 +333,10 @@ __CHICKEN_SA(sizeof(ucontext_t) == 204, "ucontext size");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");
 __CHICKEN_SA(sizeof(ucontext_t) == 312, "ucontext size");
+#elif defined(__arm__)
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 20, "ucontext sigmask offset");
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 148, "ucontext mcontext offset");
+__CHICKEN_SA(sizeof(ucontext_t) == 216, "ucontext size");
 #elif defined(__aarch64__)
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");

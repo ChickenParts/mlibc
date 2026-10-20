@@ -35,6 +35,10 @@
 extern "C" long __mlibc_clone_riscv32(unsigned long flags, void *stack, void *ptid, void *tls, void *ctid);
 #endif
 
+#if defined(__arm__)
+extern "C" long __mlibc_clone_arm(unsigned long, void *, void *, void *, void *);
+#endif
+
 #if defined(__i386__)
 extern "C" long __mlibc_clone_i386(unsigned long flags, void *stack, void *ptid, void *tls_desc, void *ctid);
 #endif
@@ -96,7 +100,11 @@ int Sysdeps<PrepareStack>::operator()(void **stack, void *entry, void *user_arg,
 	}
 
 	*stack_base = reinterpret_cast<void*>(map);
-	auto sp = reinterpret_cast<uintptr_t*>(map + *guard_size + *stack_size);
+	auto top = map + *guard_size + *stack_size;
+#if defined(__arm__)
+	top &= ~uintptr_t(7);
+#endif
+	auto sp = reinterpret_cast<uintptr_t*>(top);
 	*--sp = reinterpret_cast<uintptr_t>(user_arg);
 	*--sp = reinterpret_cast<uintptr_t>(entry);
 	*stack = reinterpret_cast<void*>(sp);
@@ -133,6 +141,9 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 #elif defined(__x86_64__)
 	/* x86_64: FS base is set from the tcb pointer directly */
 	auto ret = do_syscall(SYS_clone, flags, stack, pid_out, tcb, nullptr);
+#elif defined(__arm__)
+	auto tp = reinterpret_cast<void *>(__mlibc_arm_tp_from_tcb(reinterpret_cast<uintptr_t>(tcb), sizeof(Tcb)));
+	auto ret = static_cast<sc_result_t>(__mlibc_clone_arm(flags, stack, pid_out, tp, nullptr));
 #elif defined(__aarch64__)
 	/* aarch64: TP should point 16 bytes before end of TCB */
 	auto tp = reinterpret_cast<char *>(tcb) + sizeof(Tcb) - 0x10;

@@ -67,3 +67,42 @@ entry stack, argc/argv/environment delivery to the entry shim, the main function
 pointer's instruction state, and initializer/finalizer execution with 8-byte
 stack alignment. The __mlibc_entry body is a fixture: actual libc initialization,
 exit handling and ChickenOS process execution remain separate acceptance.
+
+## Clone and over-aligned TLS
+
+The four syscall fixtures also exercise the production clone wrapper: exact
+register/stack arguments, parent return and child entry on a newly selected
+user stack. This does not implement kernel clone or scheduling.
+
+`check_tls_arm` and `check_tls_thumb` execute compiler-generated local-exec
+accesses to real aligned(32) and aligned(64) TLS variables. Two independent
+storage areas verify placement and isolation using the production TP/TCB
+helpers. The old layout fails this regression. These bring the total to sixteen
+QEMU execution cases.
+
+## Complete libraries and client links
+
+Use `ci/chickenos-armv7a.cross-file` with an ARM-capable Clang on PATH:
+
+```
+meson setup /mnt/build/biscuit/mlibc-arm32/full \
+  --cross-file ci/chickenos-armv7a.cross-file \
+  -Ddefault_library=both -Dbuild_tests=false -Duse_freestnd_hdrs=enabled \
+  -Dlinux_kernel_headers=/home/blanham/projects/ChickenOS_/lib/glibc/sysdeps/unix/sysv/chickenos/include
+ninja -C /mnt/build/biscuit/mlibc-arm32/full
+DESTDIR=/mnt/build/biscuit/mlibc-arm32/sysroot ninja -C /mnt/build/biscuit/mlibc-arm32/full install
+```
+
+A separate build with `-mthumb` replacing `-marm` in the cross file covers
+Thumb-2 C/C++ plus ARM assembly. Keep the explicit soft-float ABI.
+
+Configure the architecture fixture build with
+`-DARM32_LIBC_SYSROOT=/mnt/build/biscuit/mlibc-arm32/sysroot/usr/local`
+to include `check_libc_links` in `check`. It links actual static and PIE clients
+and a Thumb DSO with dynamic TLS, constructors and dlopen references. These
+full-libc clients are link acceptance only, not executed ChickenOS processes.
+
+The complete profile currently requires ARMv7 lock-free atomics. Earlier-ISA
+assembly coverage does not imply a complete pre-v7 libc. Dynamic startup,
+dlopen, signals and kernel thread/TLS lifecycle need end-to-end ChickenOS tests;
+lazy PLT, TLSDESC, IFUNC and hardware FP are not admitted by this milestone.

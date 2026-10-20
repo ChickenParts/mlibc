@@ -91,7 +91,7 @@ uintptr_t getLdsoBase() {
 	auto linktime_dynamic = reinterpret_cast<uintptr_t>(_GLOBAL_OFFSET_TABLE_[0]);
 	auto runtime_dynamic = reinterpret_cast<uintptr_t>(_DYNAMIC);
 	return runtime_dynamic - linktime_dynamic;
-#elif defined(__riscv)
+#elif defined(__riscv) || defined(__arm__)
 	return reinterpret_cast<uintptr_t>(&__ehdr_start);
 #else
 	#error Unknown architecture!

@@ -27,6 +27,17 @@ svc_entry:
  stmdb sp!,{r0-r12,lr}
  mov r0,sp
  bl handle_svc
+ ldr r1,=requested_child_sp
+ ldr r0,[r1]
+ cmp r0,#0
+ beq 2f
+ mov r2,#0
+ str r2,[r1]
+ mrs r1,cpsr
+ msr cpsr_c,#0xdf
+ mov sp,r0
+ msr cpsr_c,r1
+2:
  ldmia sp!,{r0-r12,pc}^
 user_start:
  ldr sp,=0x40080000

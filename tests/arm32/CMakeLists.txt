@@ -29,8 +29,8 @@ foreach(profile v5-arm v5-thumb v7-arm v7-thumb v5-oldcpu-arm v5-oldcpu-thumb)
    -O2 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -static -fuse-ld=lld
    -I${root}/options/internal/arm-include -I${root}/options/internal/include -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/${linker}
    ${CMAKE_CURRENT_SOURCE_DIR}/jump.c ${CMAKE_CURRENT_SOURCE_DIR}/start.S
-   ${root}/options/internal/arm/setjmp.S -o ${profile}.elf
-  DEPENDS jump.c start.S ${linker} ${root}/options/internal/arm/setjmp.S ${root}/options/internal/arm-include/mlibc-asm/jmp_buf.h ${root}/options/internal/include/bits/machine.h ${root}/options/internal/include/bits/types.h VERBATIM)
+   ${root}/options/internal/arm/setjmp.S ${root}/options/internal/arm/fenv.S -o ${profile}.elf
+  DEPENDS jump.c start.S ${linker} ${root}/options/internal/arm/fenv.S ${root}/options/internal/arm/setjmp.S ${root}/options/internal/arm-include/mlibc-asm/jmp_buf.h ${root}/options/internal/include/bits/machine.h ${root}/options/internal/include/bits/types.h VERBATIM)
  add_custom_target(check_${profile}
   COMMAND ${CMAKE_COMMAND} -E env QEMU_AUDIO_DRV=none ${ARM_QEMU} -machine ${machine} -cpu ${cpu} -m 128M -kernel ${profile}.elf
    -semihosting-config enable=on,target=native -display none -serial none -no-reboot
@@ -49,7 +49,7 @@ foreach(state arm thumb)
    -I${root}/options/elf/include -I${root}/options/internal/include -I${root}/sysdeps/chickenos/include
    ${CMAKE_CURRENT_SOURCE_DIR}/loader_payload.c ${root}/options/rtld/arm/entry.S
    ${root}/options/rtld/arm/relocate.c -o ${out}.so
-  DEPENDS loader_payload.c ${root}/options/rtld/arm/entry.S ${root}/options/rtld/arm/relocate.c ${root}/options/elf/include/elf.h VERBATIM)
+  DEPENDS loader_payload.c ${root}/options/rtld/arm/entry.S ${root}/options/rtld/arm/relocation.h ${root}/options/rtld/arm/relocate.c ${root}/options/elf/include/elf.h VERBATIM)
  add_custom_command(OUTPUT ${out}/image.bin ${out}/loader_entry.h
   COMMAND ${CMAKE_COMMAND} -E make_directory ${out}
   COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/materialize_loader.rb ${out}.so ${out}/image.bin ${out}/loader_entry.h
@@ -89,8 +89,8 @@ foreach(profile v5-arm v5-thumb v7-arm v7-thumb)
    -O2 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -static -fuse-ld=lld
    -I${root}/sysdeps/chickenos/include -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/test.ld
    ${CMAKE_CURRENT_SOURCE_DIR}/syscall_test.c ${CMAKE_CURRENT_SOURCE_DIR}/syscall_start.S
-   ${root}/sysdeps/chickenos/arm/arch-syscall.S -o ${out}.elf
-  DEPENDS syscall_test.c syscall_start.S test.ld ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/include/bits/syscall.h VERBATIM)
+   ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/arm/clone.S -o ${out}.elf
+  DEPENDS syscall_test.c syscall_start.S test.ld ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/arm/clone.S ${root}/sysdeps/chickenos/include/bits/syscall.h VERBATIM)
  add_custom_target(check_syscall_${profile}
   COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/run_loader.rb --marker=ARM32_SYSCALL_OK
    ${ARM_QEMU} -machine virt -cpu cortex-a15 -m 128M -kernel ${out}.elf
@@ -115,4 +115,26 @@ foreach(state arm thumb)
    -qmp unix:${CMAKE_CURRENT_BINARY_DIR}/chickenos-mlibc-crt-${state}.sock,server,nowait
   DEPENDS ${out}.elf USES_TERMINAL VERBATIM)
  add_dependencies(check check_crt_${state})
+endforeach()
+if(ARM32_LIBC_SYSROOT)
+ add_custom_target(check_libc_links
+  COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/check_libc_link.rb ${ARM_CC} ${ARM32_LIBC_SYSROOT} ${CMAKE_CURRENT_BINARY_DIR}/libc-links
+  DEPENDS check_libc_link.rb libc_link_test.c libc_link_dso.c VERBATIM)
+ add_dependencies(check check_libc_links)
+endif()
+foreach(state arm thumb)
+ set(out ${CMAKE_CURRENT_BINARY_DIR}/tls-${state})
+ add_custom_command(OUTPUT ${out}.elf
+  COMMAND ${ARM_CC} --target=arm-none-eabi -march=armv7-a -m${state} -mfloat-abi=soft
+   -O2 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -static -fuse-ld=lld
+   -I${root}/options/internal/arm-include -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/tls_test.ld
+   ${CMAKE_CURRENT_SOURCE_DIR}/tls_test.c ${CMAKE_CURRENT_SOURCE_DIR}/tls_start.S -o ${out}.elf
+  DEPENDS tls_test.c tls_start.S tls_test.ld ${root}/options/internal/arm-include/mlibc/tls-layout.h VERBATIM)
+ add_custom_target(check_tls_${state}
+  COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/run_loader.rb --marker=ARM32_TLS_OK
+   ${ARM_QEMU} -machine virt -cpu cortex-a15 -m 128M -kernel ${out}.elf
+   -semihosting-config enable=on,target=native -display none -serial none -no-reboot
+   -qmp unix:${CMAKE_CURRENT_BINARY_DIR}/chickenos-mlibc-tls-${state}.sock,server,nowait
+  DEPENDS ${out}.elf USES_TERMINAL VERBATIM)
+ add_dependencies(check check_tls_${state})
 endforeach()
