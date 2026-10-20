@@ -72,3 +72,30 @@ target_include_directories(arm32_relocate_test PRIVATE ${root}/options/elf/inclu
 target_compile_options(arm32_relocate_test PRIVATE -O2 -UNDEBUG -Wall -Wextra -Werror)
 add_custom_target(check_relocations COMMAND arm32_relocate_test DEPENDS arm32_relocate_test)
 add_dependencies(check check_relocations)
+foreach(profile v5-arm v5-thumb v7-arm v7-thumb)
+ if(profile MATCHES "^v5")
+  set(isa armv5te)
+ else()
+  set(isa armv7-a)
+ endif()
+ if(profile MATCHES "thumb$")
+  set(state thumb)
+ else()
+  set(state arm)
+ endif()
+ set(out ${CMAKE_CURRENT_BINARY_DIR}/syscall-${profile})
+ add_custom_command(OUTPUT ${out}.elf
+  COMMAND ${ARM_CC} --target=arm-none-eabi -march=${isa} -m${state} -mfloat-abi=soft
+   -O2 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -static -fuse-ld=lld
+   -I${root}/sysdeps/chickenos/include -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/test.ld
+   ${CMAKE_CURRENT_SOURCE_DIR}/syscall_test.c ${CMAKE_CURRENT_SOURCE_DIR}/syscall_start.S
+   ${root}/sysdeps/chickenos/arm/arch-syscall.S -o ${out}.elf
+  DEPENDS syscall_test.c syscall_start.S test.ld ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/include/bits/syscall.h VERBATIM)
+ add_custom_target(check_syscall_${profile}
+  COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/run_loader.rb --marker=ARM32_SYSCALL_OK
+   ${ARM_QEMU} -machine virt -cpu cortex-a15 -m 128M -kernel ${out}.elf
+   -semihosting-config enable=on,target=native -display none -serial none -no-reboot
+   -qmp unix:${CMAKE_CURRENT_BINARY_DIR}/chickenos-mlibc-syscall-${profile}.sock,server,nowait
+  DEPENDS ${out}.elf USES_TERMINAL VERBATIM)
+ add_dependencies(check check_syscall_${profile})
+endforeach()
