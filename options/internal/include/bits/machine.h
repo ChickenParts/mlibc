@@ -24,7 +24,17 @@ struct __mlibc_jmpbuf_register_state {
 	__mlibc_uint64 __rsp;
 	__mlibc_uint64 __rip;
 };
+#elif defined (__arm__)
+/* Base AAPCS core state plus a stable reservation for VFP d8-d15.
+ * The first implementation admits soft-float only. */
+struct __mlibc_jmpbuf_register_state {
+ __mlibc_uint32 __r4_r11[8];
+ __mlibc_uint32 __sp;
+ __mlibc_uint32 __lr;
+ __mlibc_uint64 __d8_d15[8];
+};
 #elif defined (__aarch64__)
+
 struct __mlibc_jmpbuf_register_state {
 	__mlibc_uint64 __x19;
 	__mlibc_uint64 __x20;
