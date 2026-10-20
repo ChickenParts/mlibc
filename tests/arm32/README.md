@@ -58,3 +58,12 @@ the older-ISA library path, not an older kernel/vector implementation.
 
 This is an ABI execution fixture, not the complete ChickenOS kernel. That kernel
 must still implement ARM32 syscall dispatch, wide results and per-thread TP state.
+
+## Process startup glue
+
+`check_crt_arm` and `check_crt_thumb` execute the actual crt1/crti/crtn assembly
+with ARMv5TE-compatible ARM or Thumb C fixtures. They verify the unchanged
+entry stack, argc/argv/environment delivery to the entry shim, the main function
+pointer's instruction state, and initializer/finalizer execution with 8-byte
+stack alignment. The __mlibc_entry body is a fixture: actual libc initialization,
+exit handling and ChickenOS process execution remain separate acceptance.
