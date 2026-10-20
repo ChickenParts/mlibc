@@ -26,3 +26,20 @@ only admitted profile in this first slice; FP builds fail explicitly. The
 buffer reserves space for future d8-d15 preservation without changing its
 core-state offsets. Thumb-only M-profile and pre-v4T interworking are outside
 this implementation.
+
+## Dynamic interpreter bootstrap
+
+`check_loader_arm` and `check_loader_thumb` link actual ELF32 shared objects,
+materialize their PT_LOAD segments, copy them to a nonzero runtime base and
+execute the production interpreter entry/self-relocator. The final
+`interpreterMain` is a small fixture, not the full mlibc loader. It checks local
+and exported data/function pointers, calls through a relocated PLT and returns
+an ARM/Thumb entry pointer. The original SP must survive. Completion requires
+an explicit semihosted marker as well as successful QEMU exit; QMP quit alone
+cannot pass. The generated objects exercise RELATIVE, ABS32, GLOB_DAT and
+JUMP_SLOT; this is not yet shared-libc/dlopen/TLS acceptance.
+
+`check_relocations` also checks exact 32-bit writes, Thumb pointer state,
+absolute and undefined weak symbols, unresolved strong symbols, malformed
+record sizes, misalignment, unsupported types and RELA PLT refusal. The bootstrap
+operates only on its own trusted loaded image; it is not an untrusted ELF parser.

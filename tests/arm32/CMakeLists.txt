@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(mlibc_arm32_jump NONE)
+project(mlibc_arm32_jump C)
 find_program(ARM_CC clang REQUIRED)
 find_program(ARM_QEMU qemu-system-arm REQUIRED)
 set(root ${CMAKE_CURRENT_SOURCE_DIR}/../..)
@@ -39,3 +39,36 @@ foreach(profile v5-arm v5-thumb v7-arm v7-thumb v5-oldcpu-arm v5-oldcpu-thumb)
   DEPENDS ${profile}.elf USES_TERMINAL VERBATIM)
  add_dependencies(check check_${profile})
 endforeach()
+find_program(ARM_RUBY ruby REQUIRED)
+foreach(state arm thumb)
+ set(out ${CMAKE_CURRENT_BINARY_DIR}/loader-${state})
+ add_custom_command(OUTPUT ${out}.so
+  COMMAND ${ARM_CC} --target=arm-none-eabi -march=armv7-a -m${state} -mfloat-abi=soft
+   -O2 -ffreestanding -fno-builtin -fno-stack-protector -fPIC -nostdlib -fuse-ld=lld
+   -Wl,-shared,-e,_start,--hash-style=sysv
+   -I${root}/options/elf/include -I${root}/options/internal/include -I${root}/sysdeps/chickenos/include
+   ${CMAKE_CURRENT_SOURCE_DIR}/loader_payload.c ${root}/options/rtld/arm/entry.S
+   ${root}/options/rtld/arm/relocate.c -o ${out}.so
+  DEPENDS loader_payload.c ${root}/options/rtld/arm/entry.S ${root}/options/rtld/arm/relocate.c ${root}/options/elf/include/elf.h VERBATIM)
+ add_custom_command(OUTPUT ${out}/image.bin ${out}/loader_entry.h
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${out}
+  COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/materialize_loader.rb ${out}.so ${out}/image.bin ${out}/loader_entry.h
+  DEPENDS ${out}.so materialize_loader.rb VERBATIM)
+ add_custom_command(OUTPUT ${out}.elf
+  COMMAND ${ARM_CC} --target=arm-none-eabi -march=armv7-a -marm -nostdlib -static -fuse-ld=lld
+   -I${out} -DARM32_LOADER_IMAGE="${out}/image.bin" -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/test.ld
+   ${CMAKE_CURRENT_SOURCE_DIR}/loader_start.S -o ${out}.elf
+  DEPENDS loader_start.S test.ld ${out}/image.bin ${out}/loader_entry.h VERBATIM)
+ add_custom_target(check_loader_${state}
+  COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/run_loader.rb ${ARM_QEMU} -machine virt -cpu cortex-a15 -m 128M -kernel ${out}.elf
+   -semihosting-config enable=on,target=native -display none -serial none -no-reboot
+   -qmp unix:${CMAKE_CURRENT_BINARY_DIR}/chickenos-mlibc-loader-${state}.sock,server,nowait
+  COMMAND ${CMAKE_COMMAND} -E echo "PASS relocated ELF32 loader: ${state} entry"
+  DEPENDS ${out}.elf USES_TERMINAL VERBATIM)
+ add_dependencies(check check_loader_${state})
+endforeach()
+add_executable(arm32_relocate_test relocate_test.c ${root}/options/rtld/arm/relocate.c)
+target_include_directories(arm32_relocate_test PRIVATE ${root}/options/elf/include ${root}/options/internal/include ${root}/sysdeps/chickenos/include)
+target_compile_options(arm32_relocate_test PRIVATE -O2 -UNDEBUG -Wall -Wextra -Werror)
+add_custom_target(check_relocations COMMAND arm32_relocate_test DEPENDS arm32_relocate_test)
+add_dependencies(check check_relocations)

@@ -287,6 +287,20 @@ enum {
 	R_X86_64_NUM = 43
 };
 
+/* Arm ELF ABI (AAELF32), dynamic relocation numbers. */
+#define R_ARM_NONE 0
+#define R_ARM_ABS32 2
+#define R_ARM_REL32 3
+#define R_ARM_TLS_DESC 13
+#define R_ARM_TLS_DTPMOD32 17
+#define R_ARM_TLS_DTPOFF32 18
+#define R_ARM_TLS_TPOFF32 19
+#define R_ARM_COPY 20
+#define R_ARM_GLOB_DAT 21
+#define R_ARM_JUMP_SLOT 22
+#define R_ARM_RELATIVE 23
+#define R_ARM_IRELATIVE 160
+
 enum {
 	R_386_NONE = 0,
 	R_386_32 = 1,
@@ -400,6 +414,10 @@ __MLIBC_INLINE_DEFINITION Elf64_Xword ELF64_R_TYPE(Elf64_Xword info) {
 }
 __MLIBC_INLINE_DEFINITION Elf64_Xword ELF64_R_INFO(Elf64_Xword sym, Elf64_Xword type) {
 	return ((((Elf64_Xword)(sym)) << 32) + (type));
+}
+
+__MLIBC_INLINE_DEFINITION Elf32_Word ELF32_R_INFO(Elf32_Word sym, Elf32_Word type) {
+	return (sym << 8) | (type & 0xff);
 }
 
 __MLIBC_INLINE_DEFINITION Elf32_Word ELF32_R_SYM(Elf32_Word info) {
