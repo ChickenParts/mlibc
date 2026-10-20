@@ -1,0 +1,19 @@
+# First complete ARM32 profile. ISA, instruction state and FP ABI are explicit.
+# Set PATH to an ARM-capable clang installation with its compiler-rt builtins.
+[binaries]
+c = 'clang'
+cpp = 'clang++'
+c_ld = 'lld'
+cpp_ld = 'lld'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+[host_machine]
+system = 'chickenos'
+cpu_family = 'arm'
+cpu = 'armv7-a'
+endian = 'little'
+[built-in options]
+c_args = ['--target=arm-none-eabi', '-march=armv7-a', '-marm', '-mfloat-abi=soft']
+cpp_args = ['--target=arm-none-eabi', '-march=armv7-a', '-marm', '-mfloat-abi=soft']
+c_link_args = ['--target=arm-none-eabi', '-march=armv7-a', '-mfloat-abi=soft', '-nostdlib', '-fuse-ld=lld']
+cpp_link_args = ['--target=arm-none-eabi', '-march=armv7-a', '-mfloat-abi=soft', '-nostdlib', '-fuse-ld=lld']

@@ -3,6 +3,7 @@
 #include <elf.h>
 #include <stdint.h>
 #include <string.h>
+#include "../../options/rtld/arm/relocation.h"
 int __mlibc_arm_relocate_self(uintptr_t, const Elf32_Dyn *);
 static unsigned char image[1024] __attribute__((aligned(8)));
 static Elf32_Dyn dynamic[10];
@@ -25,6 +26,10 @@ static void setup(unsigned type, unsigned index) {
  dynamic[4] = (Elf32_Dyn){.d_tag=DT_SYMENT, .d_un.d_val=16};
 }
 int main(void) {
+ assert(__mlibc_arm_symbol_value(101,1,1)==101);
+ assert(__mlibc_arm_symbol_value(101,1,0)==102);
+ assert(__mlibc_arm_symbol_value(0xffffffff,1,0)==0);
+ assert(__mlibc_arm_symbol_value(0xfffffff1,0x10,1)==1);
  setup(R_ARM_RELATIVE,0);
  assert(!__mlibc_arm_relocate_self(base,dynamic));
  assert(place[0] == (uint32_t)(base+5) && place[1] == 0xcafebabe);

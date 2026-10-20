@@ -32,7 +32,18 @@ typedef struct {
 #endif
 } fenv_t;
 
+#elif defined(__arm__)
+#if defined(__ARM_FP) && __ARM_FP
+#error ARM32 FP fenv is not implemented in the initial soft-float profile
+#endif
+#define FE_ALL_EXCEPT 0
+#define FE_TONEAREST 0
+#if !defined(__ASSEMBLER__)
+typedef unsigned int fexcept_t;
+typedef unsigned int fenv_t;
+#endif
 #elif defined(__aarch64__)
+
 
 #define FE_INVALID 1
 #define FE_DIVBYZERO 2

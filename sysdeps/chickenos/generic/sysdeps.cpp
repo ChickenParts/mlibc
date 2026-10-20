@@ -16,6 +16,9 @@
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
 #include <sched.h>
+#if defined(__arm__)
+#include <mlibc/tls-layout.h>
+#endif
 
 namespace {
 	/* Resolved once, lazily.  __dlapi_vdsosym lives in the rtld, so a
@@ -77,6 +80,11 @@ void sys_libc_panic() {
 int sys_tcb_set(void *pointer) {
 #if defined(__x86_64__)
 	auto ret = do_syscall(SYS_arch_prctl, 0x1002 /* ARCH_SET_FS */, pointer);
+	if(int e = sc_error(ret); e)
+		return e;
+#elif defined(__arm__)
+	uintptr_t thread_data = __mlibc_arm_tp_from_tcb(reinterpret_cast<uintptr_t>(pointer), sizeof(Tcb));
+	auto ret = do_syscall(SYS_set_thread_area, thread_data);
 	if(int e = sc_error(ret); e)
 		return e;
 #elif defined(__aarch64__)

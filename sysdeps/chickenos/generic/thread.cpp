@@ -31,6 +31,11 @@
 #define CLONE_PARENT_SETTID 0x00100000
 #define CLONE_CHILD_CLEARTID 0x00200000
 
+#if defined(__arm__)
+#include <mlibc/tls-layout.h>
+extern "C" long __mlibc_clone_arm(unsigned long, void *, void *, void *, void *);
+#endif
+
 /**
  * Thread entry trampoline — called by the new thread after the kernel
  * starts it. The kernel has already set the TCB via CLONE_SETTLS.
@@ -111,6 +116,9 @@ int sys_clone(void *tcb, pid_t *pid_out, void *stack) {
 #if defined(__x86_64__)
 	/* x86_64: FS base is set from the tcb pointer directly */
 	auto ret = do_syscall(SYS_clone, flags, stack, pid_out, tcb, nullptr);
+#elif defined(__arm__)
+	auto tp = reinterpret_cast<void *>(__mlibc_arm_tp_from_tcb(reinterpret_cast<uintptr_t>(tcb), sizeof(Tcb)));
+	auto ret = static_cast<sc_result_t>(__mlibc_clone_arm(flags, stack, pid_out, tp, nullptr));
 #elif defined(__aarch64__)
 	/* aarch64: TP should point 16 bytes before end of TCB */
 	auto tp = reinterpret_cast<char *>(tcb) + sizeof(Tcb) - 0x10;

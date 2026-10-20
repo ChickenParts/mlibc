@@ -5,6 +5,7 @@
 #include <elf.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "relocation.h"
 
 static int relocate_table(uintptr_t base, uintptr_t table, uint32_t bytes,
                          const Elf32_Sym *symbols) {
@@ -39,7 +40,7 @@ static int relocate_table(uintptr_t base, uintptr_t table, uint32_t bytes,
   }
   /* An unresolved PLT slot holds the resolver stub, not an addend. */
   uint32_t addend = type == R_ARM_JUMP_SLOT ? 0 : *place;
-  *place = (address + addend) | thumb;
+  *place = __mlibc_arm_symbol_value(address | thumb, addend, ELF32_ST_TYPE(sym->st_info) == STT_FUNC);
  }
  return 0;
 }

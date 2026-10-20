@@ -5,6 +5,11 @@ if cpu == 'x86'
   cpu = 'i686'
 endif
 
+# ARM uses the generic freestanding declarations; compiler builtins supply its types.
+if cpu == 'arm'
+  cpu = 'riscv64'
+endif
+
 incl = include_directories(cpu / 'include')
 
 freestnd_cxx_hdrs_dep = declare_dependency(include_directories: incl)
