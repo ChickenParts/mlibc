@@ -106,3 +106,14 @@ The complete profile currently requires ARMv7 lock-free atomics. Earlier-ISA
 assembly coverage does not imply a complete pre-v7 libc. Dynamic startup,
 dlopen, signals and kernel thread/TLS lifecycle need end-to-end ChickenOS tests;
 lazy PLT, TLSDESC, IFUNC and hardware FP are not admitted by this milestone.
+
+Real-kernel integration checkpoint (2026-10-21): the ChickenOS
+`feature/biscuit-playback-20261020` worktree's Ninja target
+`check-arm32-kernel-userspace` boots the full shared kernel through Rooster/Crow
+and executes both clients built by `check_libc_links`. Static and PIE clients
+both emitted `ARM32_LIBC_OK`; the PIE exercises the real interpreter,
+`dlopen`/`dlsym`/`dlclose`, a Thumb DSO, TLS, constructors and stdio.
+The first real PIE run exposed rejection of the valid ARM `PT_ARM_EXIDX`
+metadata header; ARM builds now accept it alongside other non-load metadata.
+This does not establish C++ unwinding, normal process exit, pthread execution,
+fork/exec, signal semantics, complete services or physical Echo operation.
