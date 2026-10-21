@@ -717,6 +717,9 @@ frg::expected<LinkerError, void> ObjectRepository::_fetchFromFile(SharedObject *
 				|| phdr->p_type == PT_PHDR
 				|| phdr->p_type == PT_NOTE
 				|| phdr->p_type == PT_RISCV_ATTRIBUTES
+#if defined(__arm__)
+				|| phdr->p_type == PT_ARM_EXIDX
+#endif
 				|| phdr->p_type == PT_GNU_EH_FRAME
 				|| phdr->p_type == PT_GNU_RELRO
 				|| phdr->p_type == PT_GNU_STACK
