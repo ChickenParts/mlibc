@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <string.h>
 #include <limits.h>
+#include <stddef.h>
 
 #include <type_traits>
 
@@ -1808,9 +1809,20 @@ int Sysdeps<Sysconf>::operator()(int num, long *ret) {
 			*ret = 256;
 			return 0;
 		case _SC_NPROCESSORS_ONLN:
-		case _SC_NPROCESSORS_CONF:
-			*ret = 1;
+		case _SC_NPROCESSORS_CONF: {
+			struct sysinfo info{};
+			unsigned short cpu_count = 0;
+			if(::sysinfo(&info) == 0) {
+				/* ChickenOS stores the online CPU count in the first two
+				 * bytes of sysinfo's Linux ABI padding, immediately after
+				 * procs. Keep this offset derived from the public layout so
+				 * it works for both 32-bit and 64-bit long. */
+				const char *bytes = reinterpret_cast<const char *>(&info);
+				memcpy(&cpu_count, bytes + offsetof(struct sysinfo, procs) + sizeof(info.procs), sizeof(cpu_count));
+			}
+			*ret = cpu_count ? cpu_count : 1;
 			return 0;
+		}
 		case _SC_PHYS_PAGES: {
 			struct sysinfo info{};
 			if(::sysinfo(&info) == 0) {

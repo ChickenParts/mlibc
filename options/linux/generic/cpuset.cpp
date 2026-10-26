@@ -20,40 +20,46 @@ void __mlibc_cpu_zero(const size_t setsize, cpu_set_t *set) {
 }
 
 void __mlibc_cpu_set(const int cpu, const size_t setsize, cpu_set_t *set) {
-	if(cpu >= static_cast<int>(setsize * CHAR_BIT)) {
+	if(cpu < 0) {
 		return;
 	}
 
-	unsigned char *ptr = reinterpret_cast<unsigned char *>(set);
-	size_t off = cpu / CHAR_BIT;
-	size_t mask = 1 << (cpu % CHAR_BIT);
+	size_t word_index = static_cast<unsigned>(cpu) / CPU_MASK_BITS;
+	if(word_index >= setsize / sizeof(__cpu_mask))
+		return;
 
-	ptr[off] |= mask;
+	__cpu_mask *words = reinterpret_cast<__cpu_mask *>(set);
+	unsigned bit_index = static_cast<unsigned>(cpu) % CPU_MASK_BITS;
+	words[word_index] |= static_cast<__cpu_mask>(1) << bit_index;
 }
 
 void __mlibc_cpu_clear(const int cpu, const size_t setsize, cpu_set_t *set) {
-	if(cpu >= static_cast<int>(setsize * CHAR_BIT)) {
+	if(cpu < 0) {
 		return;
 	}
 
-	unsigned char *ptr = reinterpret_cast<unsigned char *>(set);
-	size_t off = cpu / CHAR_BIT;
-	size_t mask = 1 << (cpu % CHAR_BIT);
+	size_t word_index = static_cast<unsigned>(cpu) / CPU_MASK_BITS;
+	if(word_index >= setsize / sizeof(__cpu_mask))
+		return;
 
-	ptr[off] &= ~mask;
+	__cpu_mask *words = reinterpret_cast<__cpu_mask *>(set);
+	unsigned bit_index = static_cast<unsigned>(cpu) % CPU_MASK_BITS;
+	words[word_index] &= ~(static_cast<__cpu_mask>(1) << bit_index);
 }
 
 
 int __mlibc_cpu_isset(const int cpu, const size_t setsize, const cpu_set_t *set) {
-	if(cpu >= static_cast<int>(setsize * CHAR_BIT)) {
+	if(cpu < 0) {
 		return false;
 	}
 
-	const unsigned char *ptr = reinterpret_cast<const unsigned char *>(set);
-	size_t off = cpu / CHAR_BIT;
-	size_t mask = 1 << (cpu % CHAR_BIT);
+	size_t word_index = static_cast<unsigned>(cpu) / CPU_MASK_BITS;
+	if(word_index >= setsize / sizeof(__cpu_mask))
+		return false;
 
-	return (ptr[off] & mask);
+	const __cpu_mask *words = reinterpret_cast<const __cpu_mask *>(set);
+	unsigned bit_index = static_cast<unsigned>(cpu) % CPU_MASK_BITS;
+	return (words[word_index] & (static_cast<__cpu_mask>(1) << bit_index)) != 0;
 }
 
 int __mlibc_cpu_count(const size_t setsize, const cpu_set_t *set) {
