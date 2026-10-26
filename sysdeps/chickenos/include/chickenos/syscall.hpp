@@ -7,14 +7,14 @@
 
 using sc_word_t = __sc_word_t;
 
-#if defined(__i386__)
+#if defined(__i386__) || defined(__powerpc__)
 /* Mirror of the kernel's <chickenos/tls.h> struct chicken_tls_desc, the
  * argument of set_thread_area/get_thread_area and of clone(CLONE_SETTLS).
  * Mirrored (not included) because mlibc is built before the sysroot receives
  * the kernel's uapi headers.  The layout is a ChickenOS decision documented in
- * syscall(7)/i386(11); the kernel _Static_asserts the same 16 bytes. */
+ * syscall(7); the kernel _Static_asserts the same 16 bytes. */
 struct chicken_tls_desc {
-	unsigned int base;     /* in: TCB address */
+	unsigned int base;     /* in: thread pointer / TLS base */
 	unsigned int flags;    /* in: must be 0 */
 	unsigned int selector; /* out: %gs selector */
 	unsigned int reserved; /* must be 0 */

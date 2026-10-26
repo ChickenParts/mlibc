@@ -72,6 +72,23 @@ typedef struct {
 typedef unsigned int fexcept_t;
 typedef unsigned int fenv_t;
 
+#elif defined(__powerpc__)
+
+/* ChickenOS targets PPC32 soft-float, so it has no floating-point status or
+ * control register to save. Keep an integer placeholder for the environment
+ * and exception flags; only round-to-nearest is supported. */
+#define FE_ALL_EXCEPT 0
+#define FE_TONEAREST 0
+
+#define FE_INEXACT 0
+#define FE_UNDERFLOW 0
+#define FE_OVERFLOW 0
+#define FE_DIVBYZERO 0
+#define FE_INVALID 0
+
+typedef unsigned int fexcept_t;
+typedef unsigned int fenv_t;
+
 #elif defined (__m68k__)
 
 #if __HAVE_68881__ || __mcffpu__ || __HAVE_FPU_

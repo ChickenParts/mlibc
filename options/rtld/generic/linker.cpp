@@ -39,6 +39,9 @@ constexpr inline uintptr_t tlsOffsetFromTp = 16;
 #elif defined(__riscv)
 constexpr inline bool tlsAboveTp = true;
 constexpr inline uintptr_t tlsOffsetFromTp = 0;
+#elif defined(__powerpc__) && !defined(__powerpc64__)
+constexpr inline bool tlsAboveTp = true;
+constexpr inline ptrdiff_t tlsOffsetFromTp = -0x7000;
 #elif defined(__m68k__)
 constexpr inline bool tlsAboveTp = true;
 constexpr inline ptrdiff_t tlsOffsetFromTp = -0x7000;
@@ -144,7 +147,7 @@ elf_addr handleIfunc(elf_addr addr) {
 			._hwcap = getauxval(AT_HWCAP),
 		};
 		return reinterpret_cast<ifunc_handler>(addr)(&ifunc_arg);
-	#elif defined(__i386__) || defined(__x86_64__) || defined(__m68k__)
+	#elif defined(__i386__) || defined(__x86_64__) || defined(__m68k__) || (defined(__powerpc__) && !defined(__powerpc64__))
 		return reinterpret_cast<ifunc_handler>(addr)();
 	#else
 	#	error Unknown architecture

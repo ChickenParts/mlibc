@@ -148,6 +148,19 @@ int Sysdeps<TcbSet>::operator()(void *pointer) {
 		return e;
 	unsigned short sel = static_cast<unsigned short>(desc.selector);
 	asm volatile("movw %0, %%gs" :: "r"(sel) : "memory");
+#elif defined(__powerpc__)
+	/* PPC32 ChickenOS places the thread pointer in r2, using the ELF ABI's
+	 * +0x7000 bias from the start of static TLS. The TLS block follows the TCB,
+	 * and set_thread_area copies desc.base into the saved user r2. */
+	struct chicken_tls_desc desc = {
+		.base = reinterpret_cast<unsigned int>(reinterpret_cast<char *>(pointer) + sizeof(Tcb) + 0x7000),
+		.flags = 0,
+		.selector = 0,
+		.reserved = 0,
+	};
+	auto ret = do_syscall(SYS_set_thread_area, &desc);
+	if(int e = sc_error(ret); e)
+		return e;
 #elif defined(__aarch64__)
 	/* ⚠ + sizeof(Tcb) - 0x10, not the raw pointer.  sys_tcb_set is handed the
 	 * TCB address, but the thread pointer is defined relative to the TLS

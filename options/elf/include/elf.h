@@ -367,6 +367,19 @@ enum {
 	R_LARCH_IRELATIVE = 12
 };
 
+enum {
+	R_PPC_NONE = 0,
+	R_PPC_ADDR32 = 1,
+	R_PPC_COPY = 19,
+	R_PPC_GLOB_DAT = 20,
+	R_PPC_JMP_SLOT = 21,
+	R_PPC_RELATIVE = 22,
+	R_PPC_DTPMOD32 = 68,
+	R_PPC_TPREL32 = 73,
+	R_PPC_DTPREL32 = 78,
+	R_PPC_IRELATIVE = 248
+};
+
 typedef struct {
 	Elf32_Addr r_offset;
 	Elf32_Word r_info;

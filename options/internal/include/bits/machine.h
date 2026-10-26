@@ -96,6 +96,33 @@ struct __mlibc_jmpbuf_register_state {
 	double __fs10;
 	double __fs11;
 };
+#elif defined (__powerpc__) && !defined (__powerpc64__)
+/* PPC32 soft-float: r2, r13-r31, LR, CR and SP. */
+struct __mlibc_jmpbuf_register_state {
+	__mlibc_uint32 __r2;
+	__mlibc_uint32 __r13;
+	__mlibc_uint32 __r14;
+	__mlibc_uint32 __r15;
+	__mlibc_uint32 __r16;
+	__mlibc_uint32 __r17;
+	__mlibc_uint32 __r18;
+	__mlibc_uint32 __r19;
+	__mlibc_uint32 __r20;
+	__mlibc_uint32 __r21;
+	__mlibc_uint32 __r22;
+	__mlibc_uint32 __r23;
+	__mlibc_uint32 __r24;
+	__mlibc_uint32 __r25;
+	__mlibc_uint32 __r26;
+	__mlibc_uint32 __r27;
+	__mlibc_uint32 __r28;
+	__mlibc_uint32 __r29;
+	__mlibc_uint32 __r30;
+	__mlibc_uint32 __r31;
+	__mlibc_uint32 __lr;
+	__mlibc_uint32 __cr;
+	__mlibc_uint32 __sp;
+};
 #elif defined (__m68k__)
 struct __mlibc_jmpbuf_register_state {
 	__mlibc_uint32 __d2;

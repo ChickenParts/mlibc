@@ -222,6 +222,7 @@ if default_library_paths.length() == 0
 		'x86': 32,
 		'riscv64': 64,
 		'riscv32': 32,
+		'ppc': 32,
 		'aarch64': 64,
 		'arm': 32,
 		'm68k': 32,

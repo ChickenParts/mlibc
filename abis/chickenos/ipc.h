@@ -20,7 +20,7 @@ extern "C" {
 
 #define IPC_PRIVATE ((key_t) 0)
 
-#if defined(__aarch64__) || defined(__i386__) || defined(__m68k__) || (defined(__riscv) && __riscv_xlen == 32)
+#if defined(__aarch64__) || defined(__i386__) || defined(__m68k__) || (defined(__riscv) && __riscv_xlen == 32) || (defined(__powerpc__) && !defined(__powerpc64__))
 #define IPC_64 0x100
 #elif defined(__x86_64__) || (defined(__riscv) && __riscv_xlen == 64) || defined(__loongarch64)
 #define IPC_64 0
@@ -38,7 +38,13 @@ struct ipc64_perm {
 	gid_t cgid;
 	mode_t mode;
 	int __ipc_perm_seq;
+#if defined(__powerpc__) && !defined(__powerpc64__)
+	int __pad1;
+	long long __pad2;
+	long long __pad3;
+#else
 	long __unused[2];
+#endif
 };
 
 #define ipc_perm ipc64_perm

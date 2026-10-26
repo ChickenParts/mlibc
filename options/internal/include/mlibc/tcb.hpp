@@ -196,6 +196,10 @@ static_assert(sizeof(Tcb) - offsetof(Tcb, cancelBits) == 52);
 // sysdeps/linux/riscv64/cp_syscall.S needs to be updated whenever
 // the struct is expanded.
 static_assert(sizeof(Tcb) - offsetof(Tcb, cancelBits) == 104);
+#elif defined(__powerpc__) && !defined(__powerpc64__)
+// The PPC32 ELF ABI's thread pointer is 0x7000 bytes beyond the end of the
+// TCB. Keep the offset used by the rtld in sync with this layout.
+static_assert(TP_TCB_OFFSET == sizeof(Tcb) + 0x7000);
 #elif defined (__m68k__)
 // The thread pointer on m68k points to 0x7000 bytes *after* the end of the
 // TCB, so similarly to as on RISC-V, we need to keep the value in

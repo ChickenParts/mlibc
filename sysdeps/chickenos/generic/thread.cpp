@@ -39,6 +39,10 @@ extern "C" long __mlibc_clone_riscv32(unsigned long flags, void *stack, void *pt
 extern "C" long __mlibc_clone_i386(unsigned long flags, void *stack, void *ptid, void *tls_desc, void *ctid);
 #endif
 
+#if defined(__powerpc__)
+extern "C" long __mlibc_clone_powerpc(unsigned long flags, void *stack, void *ptid, void *tls_desc, void *ctid);
+#endif
+
 /**
  * Thread entry trampoline — called by the new thread after the kernel
  * starts it. The kernel has already set the TCB via CLONE_SETTLS.
@@ -130,6 +134,18 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 		.reserved = 0,
 	};
 	auto ret = static_cast<sc_result_t>(__mlibc_clone_i386(flags, stack, pid_out, &desc, nullptr));
+#elif defined(__powerpc__)
+	/* PPC32 ChickenOS and the PPC32 ELF TLS ABI use r2 as TP, at a +0x7000
+	 * bias from the start of the static TLS block. mlibc places that block
+	 * immediately after the TCB. The kernel clone ABI accepts the same
+	 * descriptor as set_thread_area and installs desc.base into r2. */
+	struct chicken_tls_desc desc = {
+		.base = reinterpret_cast<unsigned int>(reinterpret_cast<char *>(tcb) + sizeof(Tcb) + 0x7000),
+		.flags = 0,
+		.selector = 0,
+		.reserved = 0,
+	};
+	auto ret = static_cast<sc_result_t>(__mlibc_clone_powerpc(flags, stack, pid_out, &desc, nullptr));
 #elif defined(__x86_64__)
 	/* x86_64: FS base is set from the tcb pointer directly */
 	auto ret = do_syscall(SYS_clone, flags, stack, pid_out, tcb, nullptr);

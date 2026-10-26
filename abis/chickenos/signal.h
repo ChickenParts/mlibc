@@ -295,6 +295,48 @@ struct sigaction {
 #define CHICKEN_GREG_SP 2
 #define CHICKEN_GREG_A0 10
 #define CHICKEN_NGREG 32
+#elif defined(__powerpc__) || defined(__PPC__)
+/* Mirrors include/chickenos/ucontext.h and src/arch/powerpc/signal.c:
+ * SRR0, r0-r31, LR, CTR, XER, CR. */
+#define CHICKEN_GREG_PC 0
+#define CHICKEN_GREG_R0 1
+#define CHICKEN_GREG_R1 2
+#define CHICKEN_GREG_SP CHICKEN_GREG_R1
+#define CHICKEN_GREG_R2 3
+#define CHICKEN_GREG_R3 4
+#define CHICKEN_GREG_R4 5
+#define CHICKEN_GREG_R5 6
+#define CHICKEN_GREG_R6 7
+#define CHICKEN_GREG_R7 8
+#define CHICKEN_GREG_R8 9
+#define CHICKEN_GREG_R9 10
+#define CHICKEN_GREG_R10 11
+#define CHICKEN_GREG_R11 12
+#define CHICKEN_GREG_R12 13
+#define CHICKEN_GREG_R13 14
+#define CHICKEN_GREG_R14 15
+#define CHICKEN_GREG_R15 16
+#define CHICKEN_GREG_R16 17
+#define CHICKEN_GREG_R17 18
+#define CHICKEN_GREG_R18 19
+#define CHICKEN_GREG_R19 20
+#define CHICKEN_GREG_R20 21
+#define CHICKEN_GREG_R21 22
+#define CHICKEN_GREG_R22 23
+#define CHICKEN_GREG_R23 24
+#define CHICKEN_GREG_R24 25
+#define CHICKEN_GREG_R25 26
+#define CHICKEN_GREG_R26 27
+#define CHICKEN_GREG_R27 28
+#define CHICKEN_GREG_R28 29
+#define CHICKEN_GREG_R29 30
+#define CHICKEN_GREG_R30 31
+#define CHICKEN_GREG_R31 32
+#define CHICKEN_GREG_LR 33
+#define CHICKEN_GREG_CTR 34
+#define CHICKEN_GREG_XER 35
+#define CHICKEN_GREG_CCR 36
+#define CHICKEN_NGREG 37
 #else
 #error "Missing architecture specific code."
 #endif
@@ -333,6 +375,10 @@ __CHICKEN_SA(sizeof(ucontext_t) == 440, "ucontext size");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 20, "ucontext sigmask offset");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 148, "ucontext mcontext offset");
 __CHICKEN_SA(sizeof(ucontext_t) == 276, "ucontext size");
+#elif defined(__powerpc__) || defined(__PPC__)
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 20, "ucontext sigmask offset");
+__CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 148, "ucontext mcontext offset");
+__CHICKEN_SA(sizeof(ucontext_t) == 296, "ucontext size");
 #else /* riscv64 */
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_sigmask) == 40, "ucontext sigmask offset");
 __CHICKEN_SA(__builtin_offsetof(ucontext_t, uc_mcontext) == 168, "ucontext mcontext offset");

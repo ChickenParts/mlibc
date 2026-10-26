@@ -15,7 +15,7 @@
 #define SYS_fstat64         0x405
 #define SYS_lstat64         0x406
 #define SYS_lseek           0x07
-#define SYS_lseek64         0x407 /* 32-bit ports: off_t pair in, EDX:EAX out */
+#define SYS_lseek64         0x407 /* 32-bit ports: off_t pair in, result pair out */
 #define SYS_truncate64      0x415
 #define SYS_ftruncate64     0x416
 #define SYS_readahead64     0x419
@@ -317,11 +317,10 @@
 extern "C" {
 #endif
 
-/* 32-bit-register ports (i386, riscv32) pass a 64-bit value (off_t) as two
- * consecutive argument registers, low word first, and use each call's
- * SYS_64BIT (0x4xx) number; see include/chicken/syscall_numbers.h in the kernel
- * tree ("64-bit values on 32-bit-register ports"). */
-#if defined(__i386__) || (defined(__riscv) && __riscv_xlen == 32)
+/* 32-bit-register ports pass a 64-bit value (off_t) as two consecutive
+ * argument registers, low word first, and use each call's SYS_64BIT (0x4xx)
+ * number; see include/chicken/syscall_numbers.h in the kernel tree. */
+#if defined(__i386__) || (defined(__riscv) && __riscv_xlen == 32) || defined(__powerpc__)
 #define __CHICKEN_PAIR_ABI 1
 #endif
 
@@ -342,8 +341,9 @@ __sc_word_t __do_syscall6(long sc, __sc_word_t arg1, __sc_word_t arg2,
                           __sc_word_t arg5, __sc_word_t arg6);
 
 #if defined(__CHICKEN_PAIR_ABI)
-/* Four-argument syscall whose result is a 64-bit value in the result-register
- * pair (lseek): EDX:EAX on i386, a1:a0 on riscv32. */
+/* Four-argument syscall whose result is a 64-bit value in its result-register
+ * pair (lseek): EDX:EAX on i386, a1:a0 on riscv32, r3:r4 on PPC32. ChickenOS
+ * places the low word first in each kernel result pair. */
 long long __do_syscall4_64(long sc, __sc_word_t arg1, __sc_word_t arg2,
                            __sc_word_t arg3, __sc_word_t arg4);
 #endif
