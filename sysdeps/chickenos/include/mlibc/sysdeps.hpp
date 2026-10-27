@@ -193,6 +193,7 @@ struct ChickenOSSysdepTags :
 	VmMap,
 	VmUnmap,
 	VmProtect,
+	FutexTid,
 	FutexWait,
 	FutexWake,
 	ClockGet,

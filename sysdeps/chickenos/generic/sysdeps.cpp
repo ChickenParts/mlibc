@@ -318,6 +318,11 @@ int Sysdeps<VmProtect>::operator()(void *pointer, size_t size, int prot) {
 	return 0;
 }
 
+pid_t Sysdeps<FutexTid>::operator()() {
+	auto ret = do_syscall(SYS_gettid);
+	return sc_int_result<pid_t>(ret);
+}
+
 int Sysdeps<FutexWait>::operator()(int *pointer, int expected, const struct timespec *time) {
 	// ChickenOS futex: FUTEX_WAIT = 0
 	auto ret = do_syscall(SYS_futex, pointer, 0 /* FUTEX_WAIT */, expected, time);
