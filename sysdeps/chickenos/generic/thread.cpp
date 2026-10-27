@@ -39,7 +39,7 @@ extern "C" long __mlibc_clone_riscv32(unsigned long flags, void *stack, void *pt
 extern "C" long __mlibc_clone_i386(unsigned long flags, void *stack, void *ptid, void *tls_desc, void *ctid);
 #endif
 
-#if defined(__powerpc__)
+#if defined(__powerpc__) && !defined(__powerpc64__)
 extern "C" long __mlibc_clone_powerpc(unsigned long flags, void *stack, void *ptid, void *tls_desc, void *ctid);
 #endif
 
@@ -47,7 +47,16 @@ extern "C" long __mlibc_clone_powerpc(unsigned long flags, void *stack, void *pt
  * Thread entry trampoline — called by the new thread after the kernel
  * starts it. The kernel has already set the TCB via CLONE_SETTLS.
  */
-extern "C" void __mlibc_enter_thread(void *entry, void *user_arg) {
+#if defined(__powerpc__)
+// The PowerPC assembly clone trampoline branches to this function before the
+// new thread has established its own r30/GOT2 base. Keep this internal entry
+// point non-preemptible so the branch resolves directly to its prologue rather
+// than through a secure-PLT stub that dereferences the inherited r30 first.
+#define MLIBC_THREAD_ENTRY_VISIBILITY __attribute__((visibility("hidden")))
+#else
+#define MLIBC_THREAD_ENTRY_VISIBILITY
+#endif
+extern "C" MLIBC_THREAD_ENTRY_VISIBILITY void __mlibc_enter_thread(void *entry, void *user_arg) {
 	auto tcb = mlibc::get_current_tcb();
 
 	/* Wait until our parent sets up the TID. */
@@ -61,6 +70,7 @@ extern "C" void __mlibc_enter_thread(void *entry, void *user_arg) {
 
 	mlibc::sysdep<ThreadExit>();
 }
+#undef MLIBC_THREAD_ENTRY_VISIBILITY
 
 namespace mlibc {
 
