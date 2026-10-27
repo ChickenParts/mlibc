@@ -20,6 +20,7 @@
 
 #include "elf.hpp"
 #include "linker.hpp"
+#include "self-relocation.hpp"
 
 #if __MLIBC_POSIX_OPTION
 #include <dlfcn.h>
@@ -93,6 +94,14 @@ uintptr_t getLdsoBase() {
 	return runtime_dynamic - linktime_dynamic;
 #elif defined(__riscv)
 	return reinterpret_cast<uintptr_t>(&__ehdr_start);
+#elif defined(__powerpc__) && !defined(__powerpc64__)
+	uintptr_t base;
+	// REL16 fixups are resolved at link time; this does not read the GOT.
+	asm volatile("bl 1f\n1: mflr %0\n"
+		"addis %0,%0,(__ehdr_start-1b)@ha\n"
+		"addi %0,%0,(__ehdr_start-1b)@l"
+		: "=r"(base) : : "lr");
+	return base;
 #else
 	#error Unknown architecture!
 #endif
@@ -104,7 +113,14 @@ uintptr_t getLdsoBase() {
 // - There are no references to external symbols.
 // Note that this code is fragile in the sense that it must not contain relocations itself.
 // TODO: Use tooling to verify this at compile time.
+#if defined(__powerpc__) && !defined(__powerpc64__)
+// The PPC GOT itself needs relocation. entry.S supplies both addresses without
+// touching it, before any C code can use a GOT-loaded address of _DYNAMIC.
+extern "C" void relocateSelf(uintptr_t ldso_base, elf_dyn *dynamic) {
+#else
 extern "C" void relocateSelf() {
+	auto dynamic = _DYNAMIC;
+#endif
 	size_t rela_offset = 0;
 	size_t rela_size = 0;
 	size_t rel_offset = 0;
@@ -114,8 +130,8 @@ extern "C" void relocateSelf() {
 	size_t jmprel_offset = 0;
 	size_t jmprel_size = 0;
 	uintptr_t symtab_addr = 0;
-	for(size_t i = 0; _DYNAMIC[i].d_tag != DT_NULL; i++) {
-		auto ent = &_DYNAMIC[i];
+	for(size_t i = 0; dynamic[i].d_tag != DT_NULL; i++) {
+		auto ent = &dynamic[i];
 		switch(ent->d_tag) {
 		case DT_REL: rel_offset = ent->d_un.d_ptr; break;
 		case DT_RELSZ: rel_size = ent->d_un.d_val; break;
@@ -129,7 +145,9 @@ extern "C" void relocateSelf() {
 		}
 	}
 
+#if !defined(__powerpc__) || defined(__powerpc64__)
 	auto ldso_base = getLdsoBase();
+#endif
 
 	for(size_t disp = 0; disp < rela_size; disp += sizeof(elf_rela)) {
 		auto reloc = reinterpret_cast<elf_rela *>(ldso_base + rela_offset + disp);
@@ -151,19 +169,8 @@ extern "C" void relocateSelf() {
 	// Process JMPREL (PLT relocations) eagerly so ld.so's own PLT calls work.
 	// All JUMP_SLOT targets in ld.so reference symbols defined within ld.so itself,
 	// so we resolve them by looking up the symbol value and adding ldso_base.
-	if(jmprel_size && symtab_addr) {
-		auto symtab = reinterpret_cast<elf_sym *>(ldso_base + symtab_addr);
-		for(size_t disp = 0; disp < jmprel_size; disp += sizeof(elf_rela)) {
-			auto reloc = reinterpret_cast<elf_rela *>(ldso_base + jmprel_offset + disp);
-			auto sym_idx = ELF_R_SYM(reloc->r_info);
-			auto p = reinterpret_cast<uint64_t *>(ldso_base + reloc->r_offset);
-			if(sym_idx) {
-				*p = ldso_base + symtab[sym_idx].st_value;
-			} else {
-				*p = ldso_base + reloc->r_addend;
-			}
-		}
-	}
+	mlibc::relocateSelfPlt<elf_addr, elf_rela, elf_sym>(ldso_base,
+		jmprel_offset, jmprel_size, symtab_addr, R_JUMP_SLOT);
 
 	for(size_t disp = 0; disp < rel_size; disp += sizeof(elf_rel)) {
 		auto reloc = reinterpret_cast<elf_rel *>(ldso_base + rel_offset + disp);
@@ -467,6 +474,11 @@ extern "C" void *interpreterMain(uintptr_t *entry_stack) {
 		case DT_PLTREL:
 		case DT_BIND_NOW:
 			continue;
+#if defined(__powerpc__) && !defined(__powerpc64__)
+		case DT_PPC_GOT:
+			// Eager binding does not need Secure PLT's lazy resolver GOT words.
+			continue;
+#endif
 		case DT_FLAGS: {
 			if((ent->d_un.d_val & ~supportedDtFlags) == 0) {
 				continue;

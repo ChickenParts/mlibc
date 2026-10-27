@@ -106,6 +106,7 @@ long long __do_syscall4_64(long sc, sc_word_t arg1, sc_word_t arg2,
  * the parent's C++ frame. Pop those words, make a 16-byte aligned caller frame,
  * and enter mlibc's non-returning thread trampoline.
  */
+#if !defined(MLIBC_BUILDING_RTLD) || defined(MLIBC_STATIC_BUILD)
 #define CHK_STR2(x) #x
 #define CHK_STR(x) CHK_STR2(x)
 asm(".text\n"
@@ -126,3 +127,4 @@ asm(".text\n"
 	"1:\n\t"
 	"blr\n"
 	".size __mlibc_clone_powerpc, .-__mlibc_clone_powerpc\n");
+#endif

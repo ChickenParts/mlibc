@@ -5,6 +5,10 @@
 #define ELF_CLASS ELFCLASS32
 #define ELF_MACHINE EM_PPC
 
+// The PPC32 Secure PLT marker emitted by lld. Its value names the GOT;
+// DT_PLTGOT names the separate array of jump slots on this ABI.
+#define DT_PPC_GOT 0x70000000
+
 using elf_ehdr = Elf32_Ehdr;
 using elf_phdr = Elf32_Phdr;
 using elf_dyn = Elf32_Dyn;

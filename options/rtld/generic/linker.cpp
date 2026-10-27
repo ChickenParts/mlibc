@@ -792,6 +792,9 @@ void ObjectRepository::_parseDynamic(SharedObject *object) {
 	/* If true, ignore the RPATH.  */
 	bool runpath_found = false;
 	frg::optional<ptrdiff_t> soname_offset;
+#if defined(__powerpc__) && !defined(__powerpc64__)
+	bool securePlt = false;
+#endif
 
 	for(size_t i = 0; object->dynamic[i].d_tag != DT_NULL; i++) {
 		elf_dyn *dynamic = &object->dynamic[i];
@@ -955,6 +958,11 @@ void ObjectRepository::_parseDynamic(SharedObject *object) {
 			break;
 		case DT_TLSDESC_PLT: case DT_TLSDESC_GOT:
 			break;
+#if defined(__powerpc__) && !defined(__powerpc64__)
+		case DT_PPC_GOT:
+			securePlt = true;
+			break;
+#endif
 		default:
 			// Ignore unknown entries in the os-specific area as we don't use them.
 			if((dynamic->d_tag < DT_LOOS || dynamic->d_tag > DT_HIOS)
@@ -965,6 +973,10 @@ void ObjectRepository::_parseDynamic(SharedObject *object) {
 		}
 	}
 
+#if defined(__powerpc__) && !defined(__powerpc64__)
+	if(object->lazyTableSize && !securePlt)
+		mlibc::panicLogger() << "rtld: PPC32 requires Secure PLT in " << object->name << frg::endlog;
+#endif
 	if(runpath_offset) {
 		object->runPath = reinterpret_cast<const char *>(object->baseAddress
 				+ object->stringTableOffset + *runpath_offset);
@@ -2389,8 +2401,14 @@ void Loader::_processLazyRelocations(SharedObject *object) {
 		__ensure(object->lazyRelocTableOffset == 0);
 		return;
 	}
+#if !defined(__powerpc__) || defined(__powerpc64__)
 	object->globalOffsetTable[1] = object;
 	object->globalOffsetTable[2] = (void *)&pltRelocateStub;
+#else
+	// Secure PLT's DT_PLTGOT is an array of jump slots, without x86's
+	// reserved resolver words. Every entry is resolved by the eager loop.
+	static_assert(eagerBinding);
+#endif
 
 	if(!object->lazyTableSize)
 		return;

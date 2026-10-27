@@ -1,4 +1,4 @@
-/* Dynamic PLT resolution is unsupported by the static-only PPC32 port. */
+/* PPC32 uses eager Secure PLT binding. Lazy resolution is unsupported. */
 .global pltRelocateStub
 .type pltRelocateStub, @function
 pltRelocateStub:

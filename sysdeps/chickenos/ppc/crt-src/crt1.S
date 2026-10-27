@@ -9,10 +9,23 @@ _start:
 	 * is required so __mlibc_entry's LR save cannot land on argv[0]. The kernel
 	 * enters with r1 16-byte aligned; this preserves that alignment. */
 	stwu 1,-16(1)
-	lis 4,main@ha
-	addi 4,4,main@l
-	bl __mlibc_entry
+	bl .Lentry_pc
+.Lentry_pc:
+	mflr 4
+	addis 5,4,(.Lentry_pointer-.Lentry_pc)@ha
+	lwz 12,(.Lentry_pointer-.Lentry_pc)@l(5)
+	addis 4,4,(main-.Lentry_pc)@ha
+	addi 4,4,(main-.Lentry_pc)@l
+	/* The interpreter resolves this data pointer before entering _start.
+	 * Avoid a PLT stub here: no application GOT register is established yet. */
+	mtctr 12
+	bctrl
 	trap
 .size _start, .-_start
+
+.section .data
+.balign 4
+.Lentry_pointer:
+	.long __mlibc_entry
 
 .section .note.GNU-stack,"",@progbits
