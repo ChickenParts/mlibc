@@ -84,13 +84,24 @@ foreach(profile v5-arm v5-thumb v7-arm v7-thumb)
   set(state arm)
  endif()
  set(out ${CMAKE_CURRENT_BINARY_DIR}/syscall-${profile})
+ set(offset_object)
+ set(offset_flags)
+ set(kernel_abi_header)
+ if(ARM32_KERNEL_INCLUDE)
+  list(APPEND offset_flags -DTEST_KERNEL_ABI=1 -I${ARM32_KERNEL_INCLUDE})
+  set(kernel_abi_header ${ARM32_KERNEL_INCLUDE}/chicken/syscall_numbers.h)
+ endif()
+ if(ARM32_OFFSET_OBJECT AND profile MATCHES "^v7")
+  set(offset_object ${ARM32_OFFSET_OBJECT})
+  list(APPEND offset_flags -DTEST_SYSDEPS=1)
+ endif()
  add_custom_command(OUTPUT ${out}.elf
   COMMAND ${ARM_CC} --target=arm-none-eabi -march=${isa} -m${state} -mfloat-abi=soft
-   -O2 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -static -fuse-ld=lld
+   ${offset_flags} -std=gnu23 -O2 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -static -fuse-ld=lld
    -I${root}/sysdeps/chickenos/include -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/test.ld
    ${CMAKE_CURRENT_SOURCE_DIR}/syscall_test.c ${CMAKE_CURRENT_SOURCE_DIR}/syscall_start.S
-   ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/arm/clone.S -o ${out}.elf
-  DEPENDS syscall_test.c syscall_start.S test.ld ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/arm/clone.S ${root}/sysdeps/chickenos/include/bits/syscall.h VERBATIM)
+   ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/arm/clone.S ${offset_object} -o ${out}.elf
+  DEPENDS syscall_test.c syscall_start.S test.ld ${root}/sysdeps/chickenos/arm/arch-syscall.S ${root}/sysdeps/chickenos/arm/clone.S ${root}/sysdeps/chickenos/include/bits/syscall.h ${root}/sysdeps/chickenos/include/chickenos/offset-syscalls.h ${offset_object} ${kernel_abi_header} VERBATIM)
  add_custom_target(check_syscall_${profile}
   COMMAND ${ARM_RUBY} ${CMAKE_CURRENT_SOURCE_DIR}/run_loader.rb --marker=ARM32_SYSCALL_OK
    ${ARM_QEMU} -machine virt -cpu cortex-a15 -m 128M -kernel ${out}.elf

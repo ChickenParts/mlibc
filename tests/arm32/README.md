@@ -117,3 +117,15 @@ The first real PIE run exposed rejection of the valid ARM `PT_ARM_EXIDX`
 metadata header; ARM builds now accept it alongside other non-load metadata.
 This does not establish C++ unwinding, normal process exit, pthread execution,
 fork/exec, signal semantics, complete services or physical Echo operation.
+
+## ARM32 offset sysdeps
+
+The syscall fixtures check packed offset words, wide seek results and page-based
+mmap bounds on ARM and Thumb. Set `ARM32_OFFSET_OBJECT` to the built
+`libc.a.p/sysdeps_chickenos_arm_offset.cpp.o` to additionally execute the real
+ARM sysdep entry points in the v7 ARM and Thumb fixtures. Set
+`ARM32_KERNEL_INCLUDE` to the matching ChickenOS include directory to check
+the syscall numbers against its kernel ABI header. The SVC handler is a
+fixture; this does not run the ChickenOS kernel or qualify a filesystem.
+The current generic `sys_ftruncate` interface takes `size_t`, so its caller
+cannot pass a length above 4 GB on ARM32.

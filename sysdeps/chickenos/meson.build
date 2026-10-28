@@ -12,19 +12,23 @@ chickenos_include_dirs = [
 rtld_include_dirs += chickenos_include_dirs
 libc_include_dirs += chickenos_include_dirs
 
+chickenos_offset_syscalls = 'generic/offset.cpp'
 chickenos_arch_syscall = host_machine.cpu_family() / 'arch-syscall.cpp'
 if host_machine.cpu_family() == 'arm'
 	chickenos_arch_syscall = 'arm/arch-syscall.S'
+	chickenos_offset_syscalls = 'arm/offset.cpp'
 	libc_sources += files('arm/clone.S')
 endif
 
 rtld_sources += files(
 	chickenos_arch_syscall,
+	chickenos_offset_syscalls,
 	'generic/sysdeps.cpp',
 )
 
 libc_sources += files(
 	chickenos_arch_syscall,
+	chickenos_offset_syscalls,
 	'generic/entry.cpp',
 	'generic/sysdeps.cpp',
 	'generic/mount.cpp',
