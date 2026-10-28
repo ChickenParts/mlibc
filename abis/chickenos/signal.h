@@ -465,6 +465,22 @@ typedef struct __ucontext {
 	mcontext_t uc_mcontext;
 } ucontext_t;
 
+#elif defined(__arm__)
+#define CHICKEN_GREG_R0 0
+#define CHICKEN_GREG_SP 13
+#define CHICKEN_GREG_LR 14
+#define CHICKEN_GREG_PC 15
+#define CHICKEN_GREG_CPSR 16
+#define CHICKEN_NGREG 17
+typedef struct { unsigned long gregs[CHICKEN_NGREG]; } mcontext_t;
+typedef struct __ucontext {
+  unsigned long uc_flags;
+  struct __ucontext *uc_link;
+  stack_t uc_stack;
+  sigset_t uc_sigmask;
+  mcontext_t uc_mcontext;
+} ucontext_t;
+
 #else
 #error "Missing architecture specific code."
 #endif

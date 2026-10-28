@@ -46,7 +46,7 @@ extern "C" {
 
 typedef unsigned long shmatt_t;
 
-#if defined(__i386__) || defined(__m68k__)
+#if defined(__i386__) || defined(__arm__) || defined(__m68k__)
 struct shmid_ds {
 	struct ipc_perm shm_perm;
 	size_t shm_segsz;

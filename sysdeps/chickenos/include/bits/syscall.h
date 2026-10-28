@@ -324,6 +324,11 @@ __sc_word_t __do_syscall6(long sc, __sc_word_t arg1, __sc_word_t arg2,
                           __sc_word_t arg3, __sc_word_t arg4,
                           __sc_word_t arg5, __sc_word_t arg6);
 
+#if defined(__arm__)
+long long __do_syscall4_64(long sc, __sc_word_t arg1, __sc_word_t arg2,
+                           __sc_word_t arg3, __sc_word_t arg4);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

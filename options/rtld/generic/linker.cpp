@@ -33,6 +33,9 @@ constexpr bool eagerBinding = true;
 #if defined(__x86_64__) || defined(__i386__)
 constexpr inline bool tlsAboveTp = false;
 constexpr inline uintptr_t tlsOffsetFromTp = 0;
+#elif defined(__arm__)
+constexpr inline bool tlsAboveTp = true;
+constexpr inline uintptr_t tlsOffsetFromTp = 8;
 #elif defined(__aarch64__)
 constexpr inline bool tlsAboveTp = true;
 constexpr inline uintptr_t tlsOffsetFromTp = 16;
@@ -138,7 +141,7 @@ elf_addr handleIfunc(elf_addr addr) {
 			._hwcap = getauxval(AT_HWCAP),
 		};
 		return reinterpret_cast<ifunc_handler>(addr)(&ifunc_arg);
-	#elif defined(__i386__) || defined(__x86_64__) || defined(__m68k__)
+	#elif defined(__i386__) || defined(__x86_64__) || defined(__m68k__) || defined(__arm__)
 		return reinterpret_cast<ifunc_handler>(addr)();
 	#endif
 }
@@ -714,6 +717,9 @@ frg::expected<LinkerError, void> ObjectRepository::_fetchFromFile(SharedObject *
 				|| phdr->p_type == PT_PHDR
 				|| phdr->p_type == PT_NOTE
 				|| phdr->p_type == PT_RISCV_ATTRIBUTES
+#if defined(__arm__)
+				|| phdr->p_type == PT_ARM_EXIDX
+#endif
 				|| phdr->p_type == PT_GNU_EH_FRAME
 				|| phdr->p_type == PT_GNU_RELRO
 				|| phdr->p_type == PT_GNU_STACK
@@ -1392,6 +1398,13 @@ Tcb *allocateTcb() {
 	memset(reinterpret_cast<void *>(allocation), 0, allocSize);
 
 	uintptr_t tlsAddress, tcbAddress;
+#if defined(__arm__)
+	// Align TP, not the logical TLS base: the ARM linker rounds the initial
+	// eight-byte reservation up to the executable TLS segment's alignment.
+	tcbAddress = __mlibc_arm_tcb_address(allocation, sizeof(Tcb), alignOverhead);
+	tlsAddress = tcbAddress + sizeof(Tcb);
+	__ensure((__mlibc_arm_tp_from_tcb(tcbAddress, sizeof(Tcb)) & (alignOverhead - 1)) == 0);
+#else
 	if constexpr (tlsAboveTp) {
 		// Here we must satisfy two requirements of the TCB and the TLS data:
 		//   1. One should follow the other immediately in memory. We do this so that
@@ -1413,6 +1426,7 @@ Tcb *allocateTcb() {
 		tcbAddress = alignUp(allocation + tlsInitialSize, alignOverhead);
 		tlsAddress = tcbAddress - tlsInitialSize;
 	}
+#endif
 	__ensure((tcbAddress & (alignof(Tcb) - 1)) == 0);
 
 	if (rtldConfig.debugVerbose) {
@@ -1861,9 +1875,13 @@ void Loader::_buildTlsMaps() {
 			object->tlsModel = TlsModel::initial;
 
 			if constexpr (tlsAboveTp) {
+#if defined(__arm__)
+				runtimeTlsMap->initialPtr = __mlibc_arm_tls_offset(runtimeTlsMap->initialPtr, object->tlsAlignment);
+#else
 				size_t misalign = runtimeTlsMap->initialPtr & (object->tlsAlignment - 1);
 				if(misalign)
 					runtimeTlsMap->initialPtr += object->tlsAlignment - misalign;
+#endif
 
 				object->tlsOffset = runtimeTlsMap->initialPtr;
 				runtimeTlsMap->initialPtr += object->tlsSegmentSize;
@@ -1900,12 +1918,20 @@ void Loader::_buildTlsMaps() {
 			// There are some libraries (e.g. Mesa) that require static TLS even though
 			// they expect to be dynamically loaded.
 			if(object->haveStaticTls) {
+#if defined(__arm__)
+				// Existing thread pointers cannot be realigned after startup.
+				__ensure(object->tlsAlignment <= tlsMaxAlignment);
+#endif
 				object->tlsModel = TlsModel::initial;
 
 				if constexpr (tlsAboveTp) {
+#if defined(__arm__)
+					runtimeTlsMap->initialPtr = __mlibc_arm_tls_offset(runtimeTlsMap->initialPtr, object->tlsAlignment);
+#else
 					size_t misalign = runtimeTlsMap->initialPtr & (object->tlsAlignment - 1);
 					if(misalign)
 						runtimeTlsMap->initialPtr += object->tlsAlignment - misalign;
+#endif
 
 					object->tlsOffset = runtimeTlsMap->initialPtr;
 					runtimeTlsMap->initialPtr += object->tlsSegmentSize;
@@ -2025,14 +2051,26 @@ void Loader::_processRelocations(Relocation &rel) {
 	case R_GLOB_DAT: {
 		__ensure(rel.symbol_index());
 		uintptr_t symbol_addr = p ? p->virtualAddress() : 0;
+		#if defined(__arm__)
+		rel.relocate(__mlibc_arm_symbol_value(symbol_addr, rel.addend_rel(),
+			p && ELF_ST_TYPE(p->symbol()->st_info) == STT_FUNC));
+#else
 		rel.relocate(symbol_addr + rel.addend_norel());
+#endif
+
 	} break;
 #endif
 
 	case R_ABSOLUTE: {
 		__ensure(rel.symbol_index());
 		uintptr_t symbol_addr = p ? p->virtualAddress() : 0;
+		#if defined(__arm__)
+		rel.relocate(__mlibc_arm_symbol_value(symbol_addr, rel.addend_rel(),
+			p && ELF_ST_TYPE(p->symbol()->st_info) == STT_FUNC));
+#else
 		rel.relocate(symbol_addr + rel.addend_rel());
+#endif
+
 	} break;
 
 	case R_RELATIVE: {
