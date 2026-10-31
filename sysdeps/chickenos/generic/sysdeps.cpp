@@ -1668,6 +1668,16 @@ int sys_iopl(int level) {
 
 #endif // __MLIBC_POSIX_OPTION
 
+// libc.a embeds the static rtld sysdeps object, which can be selected first.
+#if __MLIBC_LINUX_REBOOT_OPTION && (!defined(MLIBC_BUILDING_RTLD) || defined(MLIBC_STATIC_BUILD))
+int sys_reboot(int cmd) {
+	constexpr int magic1 = static_cast<int>(0xfee1deadU);
+	constexpr int magic2 = 672274793;
+	auto ret = do_syscall(SYS_reboot, magic1, magic2, cmd, nullptr);
+	return sc_error(ret);
+}
+#endif
+
 } // namespace mlibc
 
 // C-linkage syscall() wrapper — used by programs that call syscalls directly.

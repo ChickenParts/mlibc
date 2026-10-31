@@ -34,7 +34,6 @@ libc_sources += files(
 	'generic/mount.cpp',
 	'generic/thread.cpp',
 	'generic/sysinfo.cpp',
-	'generic/reboot.cpp',
 )
 
 if not no_headers
