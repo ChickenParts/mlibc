@@ -174,6 +174,9 @@ struct ChickenOSSysdepTags :
 	Statfs,
 	Fstatfs,
 #endif // __MLIBC_LINUX_OPTION
+#if __MLIBC_LINUX_REBOOT_OPTION
+	Reboot,
+#endif // __MLIBC_LINUX_REBOOT_OPTION
 #if __MLIBC_LINUX_EPOLL_OPTION
 	EpollCreate,
 	EpollCtl,
