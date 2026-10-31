@@ -1668,10 +1668,6 @@ int sys_iopl(int level) {
 
 #endif // __MLIBC_POSIX_OPTION
 
-#if __MLIBC_LINUX_REBOOT_OPTION && !defined(MLIBC_BUILDING_RTLD)
-#include "reboot.inc"
-#endif
-
 } // namespace mlibc
 
 // C-linkage syscall() wrapper — used by programs that call syscalls directly.

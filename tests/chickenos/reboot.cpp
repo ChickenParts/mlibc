@@ -1,12 +1,9 @@
+// SPDX-License-Identifier: MIT
 #include <cassert>
 #include <cerrno>
+#include <chickenos/syscall.hpp>
 #include <cstdint>
 #include <mlibc/linux-reboot-sysdeps.hpp>
-#include <chickenos/syscall.hpp>
-
-namespace mlibc {
-#include "../../sysdeps/chickenos/generic/reboot.inc"
-}
 
 static long result;
 static int calls;
