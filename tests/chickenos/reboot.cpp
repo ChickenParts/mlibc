@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: MIT
 #include <cassert>
 #include <cerrno>
+#include <chickenos/syscall.hpp>
 #include <cstdint>
 #include <mlibc/all-sysdeps.hpp>
-#include <chickenos/syscall.hpp>
 
 static long result;
 static int calls;

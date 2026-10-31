@@ -1,5 +1,6 @@
-#include <mlibc/all-sysdeps.hpp>
+// SPDX-License-Identifier: MIT
 #include <chickenos/syscall.hpp>
+#include <mlibc/all-sysdeps.hpp>
 
 #if __MLIBC_LINUX_REBOOT_OPTION
 namespace mlibc {
